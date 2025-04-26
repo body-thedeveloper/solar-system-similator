@@ -115,7 +115,7 @@ export const planetData: PlanetData[] = [
     radius: 4.5,
     distanceFromSun: 85,
     orbitSpeed: 0.0009,
-    texture: 'Saturn.jpg',
+    texture: 'saturn.jpg',
     description: 'Saturn is the sixth planet from the Sun and the second-largest in the Solar System, after Jupiter. It is a gas giant with an average radius about nine times that of Earth.',
     diameter: 120536,
     mass: '5.68 × 10^26 kg',
