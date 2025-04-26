@@ -58,8 +58,8 @@ export function setupSolarSystem(
 // scene.add(sunGlow);
    // Load textures first
    const textureLoader = new THREE.TextureLoader();
-   const sunTexture = textureLoader.load(`/images/sun.jpg`);
-   const moonTexture = textureLoader.load(`/images/moon.jpg`);
+   const sunTexture = textureLoader.load(`${import.meta.env.BASE_URL}images/sun.jpg`);
+   const moonTexture = textureLoader.load(`${import.meta.env.BASE_URL}images/moon.jpg`);
  
   // Create planets
   const planets: THREE.Group[] = [];
@@ -133,7 +133,7 @@ export function setupSolarSystem(
     });
     
     // Load texture asynchronously
-    textureLoader.load(`/images/${planet.texture}`, (texture) => {
+    textureLoader.load(`${import.meta.env.BASE_URL}images/${planet.texture}`, (texture) => {
       planetMaterial.map = texture;
       planetMaterial.needsUpdate = true;
     });
