@@ -1,6 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { PlanetData } from '../assets/textures/planetData';
+import { PlanetData } from '../data/planetData';
 
 interface ComparisonPanelProps {
   planetA: PlanetData | null;
@@ -117,20 +117,23 @@ const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
               </div>
               
               {/* Comparison results */}
-              {planetA && planetB && (
+              {planetA && planetB && planetA.id !== planetB.id && (
                 <div className="mt-6 p-4 bg-white/10 rounded-lg">
                   <h3 className="text-lg font-bold mb-3">Comparison Results</h3>
                   <div className="space-y-2">
                     <p>
                       <span className="text-gray-300">Size difference:</span>{' '}
-                      {planetA.diameter > planetB.diameter 
+                      {planetA.diameter > planetB.diameter && planetB.diameter !== 0
                         ? `${planetA.name} is ${(planetA.diameter / planetB.diameter).toFixed(1)}x larger than ${planetB.name}`
-                        : `${planetB.name} is ${(planetB.diameter / planetA.diameter).toFixed(1)}x larger than ${planetA.name}`
-                      }
+                        : planetB.diameter > planetA.diameter && planetA.diameter !== 0
+                        ? `${planetB.name} is ${(planetB.diameter / planetA.diameter).toFixed(1)}x larger than ${planetA.name}`
+                        : 'Same size'}
                     </p>
                     <p>
                       <span className="text-gray-300">Orbital speed ratio:</span>{' '}
-                      {speedRatio && `${planetA.name}'s orbital speed is ${speedRatio}x ${parseFloat(speedRatio) > 1 ? 'faster' : 'slower'} than ${planetB.name}'s`}
+                      {speedRatio && planetB.orbitSpeed !== 0
+                        ? `${planetA.name}'s orbital speed is ${speedRatio}x ${parseFloat(speedRatio) > 1 ? 'faster' : 'slower'} than ${planetB.name}'s`
+                        : 'N/A'}
                     </p>
                     <p>
                       <span className="text-gray-300">Distance between planets:</span>{' '}

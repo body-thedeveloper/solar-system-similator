@@ -1,12 +1,31 @@
 import React from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Pause, Play } from 'lucide-react';
 
 interface SpeedControlProps {
   speed: number;
   onChange: (speed: number) => void;
+  paused?: boolean;
+  onPauseToggle?: () => void;
+  hideMoons?: boolean;
+  onHideMoonsChange?: (v: boolean) => void;
+  showLabels?: boolean;
+  onShowLabelsChange?: (v: boolean) => void;
+  planetScale?: number;
+  onPlanetScaleChange?: (v: number) => void;
 }
 
-const SpeedControl: React.FC<SpeedControlProps> = ({ speed, onChange }) => {
+const SpeedControl: React.FC<SpeedControlProps> = ({
+  speed,
+  onChange,
+  paused,
+  onPauseToggle,
+  hideMoons,
+  onHideMoonsChange,
+  showLabels,
+  onShowLabelsChange,
+  planetScale,
+  onPlanetScaleChange
+}) => {
   return (
     <div className="bg-black/60 backdrop-blur-sm rounded-lg p-3 text-white flex items-center gap-3">
       <Clock size={18} className="text-gray-400" />
@@ -22,11 +41,54 @@ const SpeedControl: React.FC<SpeedControlProps> = ({ speed, onChange }) => {
             value={speed}
             onChange={(e) => onChange(parseFloat(e.target.value))}
             className="w-32 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            disabled={paused}
           />
           <span className="text-xs">Fast</span>
         </div>
       </div>
       <div className="text-sm font-bold ml-2">{speed.toFixed(1)}x</div>
+      <button
+        onClick={onPauseToggle}
+        className="ml-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+        aria-label={paused ? "Resume" : "Pause"}
+        type="button"
+      >
+        {paused ? <Play size={18} /> : <Pause size={18} />}
+      </button>
+      {/* New controls next to pause button */}
+      <div className="flex items-center gap-2 ml-2">
+        <label className="flex items-center gap-1 text-xs bg-white/10 px-2 py-1 rounded-lg hover:bg-white/20 transition-colors cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!hideMoons}
+            onChange={e => onHideMoonsChange?.(e.target.checked)}
+            className="accent-blue-500 w-3 h-3"
+          />
+          Hide Moons
+        </label>
+        <label className="flex items-center gap-1 text-xs bg-white/10 px-2 py-1 rounded-lg hover:bg-white/20 transition-colors cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!showLabels}
+            onChange={e => onShowLabelsChange?.(e.target.checked)}
+            className="accent-blue-500 w-3 h-3"
+          />
+          Show Labels
+        </label>
+        <label className="flex items-center gap-1 text-xs bg-white/10 px-2 py-1 rounded-lg hover:bg-white/20 transition-colors cursor-pointer">
+          <span>Size</span>
+          <input
+            type="range"
+            min={0.5}
+            max={2}
+            step={0.05}
+            value={planetScale}
+            onChange={e => onPlanetScaleChange?.(parseFloat(e.target.value))}
+            className="w-16 accent-blue-500"
+          />
+          <span>{planetScale?.toFixed(2)}x</span>
+        </label>
+      </div>
     </div>
   );
 };

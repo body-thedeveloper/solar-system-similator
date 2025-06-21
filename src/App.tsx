@@ -3,8 +3,8 @@ import { setupSolarSystem } from './components/SolarSystem';
 import InfoPanel from './components/InfoPanel';
 import SpeedControl from './components/SpeedControl';
 import ComparisonPanel from './components/ComparisonPanel';
-import { PlanetData } from './assets/textures/planetData';
-import { Sun } from 'lucide-react';
+import { PlanetData } from './data/planetData';
+import { Sun, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
 
 function App() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -16,63 +16,153 @@ function App() {
     planetB: PlanetData | null;
   }>({ planetA: null, planetB: null });
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [paused, setPaused] = useState<boolean>(false);
+  const [hideMoons, setHideMoons] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
+  const [planetScale, setPlanetScale] = useState(1);
+  const [solarApi, setSolarApi] = useState<any>(null);
+  const [galaxyVisible, setGalaxyVisible] = useState(false);
 
   useEffect(() => {
     if (canvasRef.current) {
-      // Initialize the solar system
-      const { 
-        selectPlanet, 
-        updateSimulationSpeed, 
-        cleanupScene 
-      } = setupSolarSystem(canvasRef.current, (planet) => {
-        setSelectedPlanet(prev => prev?.id === planet.id ? null : planet);
-        
-        // Update comparison planets if needed
-        if (showComparison) {
-          if (!comparisonPlanets.planetA) {
-            setComparisonPlanets({ ...comparisonPlanets, planetA: planet });
-          } else if (!comparisonPlanets.planetB && comparisonPlanets.planetA.id !== planet.id) {
-            setComparisonPlanets({ ...comparisonPlanets, planetB: planet });
+      const api = setupSolarSystem(
+        canvasRef.current,
+        (planet) => {
+          if (planet.id === 'sun') {
+            setSelectedPlanet({
+              id: 'sun',
+              name: 'Sun',
+              radius: 8.5,
+              distanceFromSun: 0,
+              orbitSpeed: 0,
+              texture: 'sun.jpg',
+              description: 'The Sun is the star at the center of the Solar System. It is a nearly perfect sphere of hot plasma and is by far the most important source of energy for life on Earth.',
+              diameter: 1391400,
+              mass: '1.989 × 10^30 kg',
+              dayLength: '25 days (equator)',
+              yearLength: '—',
+              avgTemp: '5,505°C (surface)',
+              funFact: 'The Sun contains 99.86% of the mass in the Solar System!',
+              moons: []
+            });
+            return;
           }
-        }
-      });
+          if (showComparison) {
+            // Only allow valid PlanetData (not the sun) for comparison
+            if (planet.id === 'sun') {
+              return;
+            }
+            // Type guard: ensure planet is PlanetData (not just {id: string})
+            if (
+              typeof planet.name === 'string' &&
+              typeof planet.radius === 'number' &&
+              typeof planet.distanceFromSun === 'number'
+            ) {
+              setComparisonPlanets(prev => {
+                // Type guard: ensure planet is PlanetData
+                if (
+                  typeof planet.name === 'string' &&
+                  typeof planet.radius === 'number' &&
+                  typeof planet.distanceFromSun === 'number'
+                ) {
+                  if (prev.planetA?.id === planet.id || prev.planetB?.id === planet.id) {
+                    return prev;
+                  }
+                  if (!prev.planetA) {
+                    return { ...prev, planetA: planet as PlanetData };
+                  }
+                  if (!prev.planetB && prev.planetA.id !== planet.id) {
+                    return { planetA: prev.planetA, planetB: planet as PlanetData };
+                  }
+                }
+                return prev;
+              });
+            }
+          } else {
+            setSelectedPlanet(planet as PlanetData);
+          }
+        },
+        { hideMoons, showLabels, planetScale }
+      );
+      setSolarApi(api);
 
-      // Update simulation speed when the slider changes
-      updateSimulationSpeed(simulationSpeed);
+      api.updateSimulationSpeed(paused ? 0 : simulationSpeed);
 
-      // Set loading to false after initialization
+      // Sync moons/labels/scale on mount
+      api.setMoonsVisible?.(!hideMoons);
+      api.setLabelsVisible?.(showLabels);
+      api.setPlanetScale?.(planetScale);
+
       setTimeout(() => setIsLoading(false), 2000);
 
       return () => {
-        cleanupScene();
+        api.cleanupScene();
       };
     }
-  }, []);
+  }, [showComparison, hideMoons, showLabels, planetScale, paused, simulationSpeed]);
   
   useEffect(() => {
     // Update simulation speed when slider changes
     if (canvasRef.current) {
       const scene = window.solarSystem;
       if (scene && scene.updateSimulationSpeed) {
-        scene.updateSimulationSpeed(simulationSpeed);
+        scene.updateSimulationSpeed(paused ? 0 : simulationSpeed);
       }
     }
-  }, [simulationSpeed]);
+  }, [simulationSpeed, paused]);
+
+  // --- Galaxy overlay effect ---
+  useEffect(() => {
+    if (!solarApi) return;
+    let raf: number;
+    function checkGalaxy() {
+      if (solarApi.isGalaxyVisible) {
+        setGalaxyVisible(solarApi.isGalaxyVisible());
+      }
+      raf = requestAnimationFrame(checkGalaxy);
+    }
+    checkGalaxy();
+    return () => {
+      if (raf) {
+        cancelAnimationFrame(raf);
+      }
+    };
+  }, [solarApi]);
 
   const handleSpeedChange = (speed: number) => {
     setSimulationSpeed(speed);
   };
 
+  const handlePauseToggle = () => {
+    setPaused((prev) => !prev);
+  };
+
   const handleToggleComparison = () => {
-    setShowComparison(!showComparison);
-    // Reset comparison planets when closing
-    if (showComparison) {
-      setComparisonPlanets({ planetA: null, planetB: null });
-    }
+    setShowComparison((prev) => {
+      if (!prev) {
+        // Opening comparison: clear selection
+        setComparisonPlanets({ planetA: null, planetB: null });
+        setSelectedPlanet(null);
+      } else {
+        // Closing comparison: clear selection
+        setComparisonPlanets({ planetA: null, planetB: null });
+      }
+      return !prev;
+    });
   };
 
   const handleResetComparison = () => {
     setComparisonPlanets({ planetA: null, planetB: null });
+  };
+
+  const handleChooseAsA = (planet: PlanetData) => {
+    setComparisonPlanets(prev => ({ ...prev, planetA: planet }));
+    if (!showComparison) setShowComparison(true);
+  };
+
+  const handleChooseAsB = (planet: PlanetData) => {
+    setComparisonPlanets(prev => ({ ...prev, planetB: planet }));
+    if (!showComparison) setShowComparison(true);
   };
 
   return (
@@ -93,17 +183,60 @@ function App() {
 
       {/* UI Controls */}
       <div className="absolute bottom-5 left-0 right-0 z-10 flex justify-center">
-        <SpeedControl 
-          speed={simulationSpeed} 
-          onChange={handleSpeedChange} 
-        />
+        <div className="flex items-center gap-2">
+          {/* Zoom Out Button */}
+          <button
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            aria-label="Zoom Out"
+            onClick={() => solarApi?.zoomOut?.()}
+            type="button"
+          >
+            <ZoomOut size={20} />
+          </button>
+          {/* SpeedControl */}
+          <SpeedControl 
+            speed={simulationSpeed} 
+            onChange={handleSpeedChange}
+            paused={paused}
+            onPauseToggle={handlePauseToggle}
+            hideMoons={hideMoons}
+            onHideMoonsChange={setHideMoons}
+            showLabels={showLabels}
+            onShowLabelsChange={setShowLabels}
+            planetScale={planetScale}
+            onPlanetScaleChange={setPlanetScale}
+          />
+          {/* Zoom In Button */}
+          <button
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            aria-label="Zoom In"
+            onClick={() => solarApi?.zoomIn?.()}
+            type="button"
+          >
+            <ZoomIn size={20} />
+          </button>
+        </div>
       </div>
 
-      {/* Info Panel - shows when a planet is selected */}
+      {/* Info Panel - shows when a planet is selected and NOT comparing */}
       {selectedPlanet && !showComparison && (
         <InfoPanel 
           planet={selectedPlanet} 
           onClose={() => setSelectedPlanet(null)}
+          showComparison={false}
+          comparisonPlanets={comparisonPlanets}
+          onChooseAsA={handleChooseAsA}
+          onChooseAsB={handleChooseAsB}
+        />
+      )}
+
+      {/* Comparison Panel */}
+      {showComparison && (
+        <ComparisonPanel 
+          planetA={comparisonPlanets.planetA}
+          planetB={comparisonPlanets.planetB}
+          onReset={handleResetComparison}
+          onClose={handleToggleComparison}
         />
       )}
 
@@ -117,23 +250,6 @@ function App() {
         >
           Compare Planets
         </button>
-      </div>
-
-      {/* Comparison Panel */}
-      {showComparison && (
-        <ComparisonPanel 
-          planetA={comparisonPlanets.planetA}
-          planetB={comparisonPlanets.planetB}
-          onReset={handleResetComparison}
-          onClose={handleToggleComparison}
-        />
-      )}
-
-      {/* Instructions Overlay - only visible initially */}
-      <div className="absolute bottom-20 left-0 right-0 z-10 flex justify-center pointer-events-none">
-        <div className="bg-black/50 text-white p-3 rounded-lg text-sm max-w-md text-center backdrop-blur-sm">
-          <p>Click on planets to view details. Use your mouse to rotate the view (drag) and zoom (scroll).</p>
-        </div>
       </div>
     </div>
   );
