@@ -16,441 +16,290 @@ export function setupSolarSystem(
   onPlanetClick: (planet: PlanetData | { id: 'sun', [key: string]: any }) => void,
   options?: { hideMoons?: boolean; showLabels?: boolean; planetScale?: number }
 ) {
-  // Scene setup
+  // Scene & renderer
   const scene = new THREE.Scene();
-  
-  // Create a renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
   container.appendChild(renderer.domElement);
 
-  // Create a camera with increased far plane
-  const camera = new THREE.PerspectiveCamera(
-    45, 
-    container.clientWidth / container.clientHeight, 
-    0.1, 
-    200000  // Increased far plane
-  );
+  // Camera & controls
+  const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 200000);
   camera.position.set(0, 50, 100);
-  
-  // Create controls with adjusted maxDistance
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
   controls.minDistance = 20;
-  controls.maxDistance = 100000;  // Allow very far zoom
+  controls.maxDistance = 100000;
 
-  // Add ambient light
-  const ambientLight = new THREE.AmbientLight(0x111111);
-  scene.add(ambientLight);
-  
-  // Add stars background
-  addStarsBackground(scene);
-  
-  // Add a point light at the center (sun)
+  // Lighting & background
+  scene.add(new THREE.AmbientLight(0x111111));
   const sunLight = new THREE.PointLight(0xffffff, 2, 1000, 0.5);
   sunLight.position.set(0, 0, 0);
   scene.add(sunLight);
-  
-  // Create the texture loader ONCE here
-  const textureLoader = new THREE.TextureLoader();
-  const sunTexture = textureLoader.load(`${import.meta.env.BASE_URL}images/sun.jpg`);
-  const moonTexture = textureLoader.load(`${import.meta.env.BASE_URL}images/moon.jpg`);
- 
-  // Create planets
+
+  // Loaders & textures
+  const loader = new THREE.TextureLoader();
+  const sunTexture = loader.load(`${import.meta.env.BASE_URL}images/sun.jpg`);
+  const moonTexture = loader.load(`${import.meta.env.BASE_URL}images/moon.jpg`);
+  const saturnRingTexture = loader.load(`${import.meta.env.BASE_URL}images/saturn_ring.png`);
+
+  // Configuration constants
+  const ORBIT_DISTANCE_SCALE = 1.8;    // spread planetary orbits
+  // Keep authoritative km->visual scale small so moons stay small visually (matches original look)
+  const MOON_SIZE_SCALE = 1.0;
+  const AUTH_MOON_VISUAL_SCALE = 0.35 // scale applied when converting km ratios -> visual units
+  const MOON_ORBIT_BASE = 3.5;         // base orbit radius multiplier for moons
+  let simulationSpeed = 0.6;           // default as requested
+  let currentPlanetScale = options?.planetScale ?? 1;
+
+  // Real planet radii (km) for ratio calculations
+  const PLANET_REAL_RADII_KM: Record<string, number> = {
+    mercury: 2439.7, venus: 6051.8, earth: 6371.0, mars: 3389.5,
+    jupiter: 69911, saturn: 58232, uranus: 25362, neptune: 24622, pluto: 1188.3
+  };
+
+  // Authoritative major moons (name + radius in km).
+  const AUTHORITATIVE_MOONS: Record<string, { name: string; radius: number }[]> = {
+    mercury: [], venus: [],
+    earth: [{ name: 'Moon', radius: 1737.1 }],
+    mars: [{ name: 'Phobos', radius: 11.267 }, { name: 'Deimos', radius: 6.2 }],
+    jupiter: [
+      { name: 'Io', radius: 1821.6 }, { name: 'Europa', radius: 1560.8 },
+      { name: 'Ganymede', radius: 2634.1 }, { name: 'Callisto', radius: 2410.3 }
+    ],
+    saturn: [
+      { name: 'Titan', radius: 2574.7 }, { name: 'Rhea', radius: 763.8 }, { name: 'Iapetus', radius: 734.5 },
+      { name: 'Dione', radius: 561.4 }, { name: 'Tethys', radius: 533.1 }, { name: 'Enceladus', radius: 252.1 }, { name: 'Mimas', radius: 198.2 }
+    ],
+    uranus: [
+      { name: 'Titania', radius: 788.9 }, { name: 'Oberon', radius: 761.4 }, { name: 'Umbriel', radius: 584.7 },
+      { name: 'Ariel', radius: 578.9 }, { name: 'Miranda', radius: 235.8 }
+    ],
+    neptune: [{ name: 'Triton', radius: 1353.4 }, { name: 'Proteus', radius: 210.0 }, { name: 'Nereid', radius: 170.0 }],
+    pluto: [{ name: 'Charon', radius: 606.0 }, { name: 'Nix', radius: 49.0 }, { name: 'Hydra', radius: 51.0 }]
+  };
+
+  // Extra moon info to populate moon cards (diameter/mass/fun facts where known)
+  const MOON_DETAILS: Record<string, {
+    description?: string;
+    funFact?: string;
+    mass?: string;
+    dayLength?: string;
+    yearLength?: string;
+    avgTemp?: string;
+    diameterKm?: number;
+  }> = {
+    moon: {
+      description: 'Earth’s Moon is the only place beyond Earth where humans have set foot.',
+      funFact: 'The Moon influences Earth\'s tides and stabilizes its axial tilt.',
+      diameterKm: 3474.2,
+      avgTemp: '-20°C (lunar day average)'
+    },
+    phobos: {
+      description: 'Phobos is the larger and closer of Mars’s two moons. It orbits very close to Mars.',
+      funFact: 'Phobos is slowly spiraling inward and will either crash into Mars or break apart into a ring.',
+      diameterKm: 22.533,
+      avgTemp: '-40°C'
+    },
+    deimos: {
+      description: 'Deimos is the smaller, outer moon of Mars.',
+      funFact: 'Deimos is likely a captured asteroid.',
+      diameterKm: 12.4,
+      avgTemp: '-40°C'
+    },
+    io: { description: 'Io is the most volcanically active body in the Solar System.', funFact: 'Io has hundreds of volcanoes.' , diameterKm: 3643.2 },
+    europa: { description: 'Europa likely has a subsurface salty ocean under its ice.', funFact: 'Europa is a prime target for ocean-world exploration.', diameterKm: 3121.6 },
+    ganymede: { description: 'Ganymede is the largest moon in the Solar System.', funFact: 'Ganymede is larger than Mercury.', diameterKm: 5268.2 },
+    callisto: { description: 'Callisto is heavily cratered and ancient.', funFact: 'Callisto\'s surface is one of the oldest landscapes in the Solar System.', diameterKm: 4820.6 },
+    titan: { description: 'Titan is Saturn’s largest moon with a thick atmosphere.', funFact: 'Titan has lakes of liquid methane and ethane.', diameterKm: 5149.4 },
+    enceladus: { description: 'Enceladus has cryovolcanic plumes that spray water vapor.', funFact: 'Enceladus ejects water vapor into space from its south polar region.', diameterKm: 504.2 },
+    mimas: { description: 'Mimas is known for a large impact crater that gives it a "Death Star" look.', funFact: 'The crater Herschel makes Mimas look like the Death Star.', diameterKm: 396.4 },
+    triton: { description: 'Triton is Neptune’s largest moon and is geologically active.', funFact: 'Triton orbits retrograde and may be a captured Kuiper belt object.', diameterKm: 2706.8 },
+    charon: { description: 'Charon is Pluto’s largest moon and is large relative to Pluto.', funFact: 'Pluto–Charon are sometimes considered a binary dwarf-planet system.', diameterKm: 1212.0 }
+  };
+
+  // Containers & lookups
   const planets: THREE.Group[] = [];
   const planetMeshes: Record<string, THREE.Mesh> = {};
   const planetOrbits: { line: THREE.Line, planetId: string, points: THREE.Vector3[] }[] = [];
   const moonGroups: Record<string, THREE.Group> = {};
+  const moonMeshes: Record<string, THREE.Mesh> = {};
   const labelSprites: Record<string, THREE.Sprite> = {};
-  let simulationSpeed = 0.5;
-  let currentPlanetScale = options?.planetScale ?? 1;
-  
-  // Update simulation speed
-  function updateSimulationSpeed(speed: number) {
-    simulationSpeed = speed;
-  }
-  
-  // --- GALAXY BACKGROUND ---
-  let galaxyPoints: THREE.Points | null = null;
-  const GALAXY_LAYERS = {
-    CLOSE: { START: 2000, END: 3500, SIZE: 5000 },
-    MID: { START: 3500, END: 20000, SIZE: 50000 },
-    FAR: { START: 20000, END: 100000, SIZE: 200000 }
-  };
-  let galaxyVisible = false;
-
-  function createMultiLayerGalaxy() {
-    const geometry = new THREE.BufferGeometry();
-    const totalStars = 5000; // Reduced from 150000
-    const positions = [];
-    const colors = [];
-    const sizes = [];
-
-    // Adjust proportions for fewer stars
-    const mainGalaxyStars = Math.floor(totalStars * 0.4);  // ~2000 stars
-    const midStars = Math.floor(totalStars * 0.3);         // ~1500 stars
-    const farStars = totalStars - mainGalaxyStars - midStars; // ~1500 stars
-
-    // Helper function to generate star color
-    const getStarColor = (layer: 'core' | 'arm' | 'distant', bright = false) => {
-      const r = Math.random();
-      switch (layer) {
-        case 'core':
-          return [
-            1.0,                    // R
-            0.9 + 0.1 * r,         // G
-            0.7 + 0.3 * r          // B
-          ];
-        case 'arm':
-          return bright ? [
-            0.7 + 0.3 * r,         // R
-            0.8 + 0.2 * r,         // G
-            1.0                     // B
-          ] : [
-            0.6 + 0.4 * r,         // R
-            0.6 + 0.4 * r,         // G
-            0.8 + 0.2 * r          // B
-          ];
-        case 'distant':
-          return [
-            0.8 + 0.2 * r,         // R
-            0.8 + 0.2 * r,         // G
-            0.9 + 0.1 * r          // B
-          ];
-      }
-    };
-
-    // Create main galaxy (close layer)
-    for (let i = 0; i < mainGalaxyStars; i++) {
-      const isCore = i < mainGalaxyStars * 0.3;
-      if (isCore) {
-        // Dense core stars
-        const r = Math.pow(Math.random(), 2) * 100;
-        const theta = Math.random() * Math.PI * 2;
-        const phi = (Math.random() - 0.5) * 0.3;
-        positions.push(
-          r * Math.cos(theta),
-          r * Math.sin(phi),
-          r * Math.sin(theta)
-        );
-        const color = getStarColor('core');
-        colors.push(...color);
-        sizes.push(2.5 + Math.random());
-      } else {
-        // Spiral arms (4 arms for Milky Way)
-        const arm = Math.floor(Math.random() * 4);
-        const r = 100 + Math.pow(Math.random(), 2) * 400;
-        let theta = (Math.random() * Math.PI * 2) + (arm * (Math.PI * 2) / 4);
-        theta += (r / 200) * 0.25; // Spiral factor
-        
-        const spread = (1 - Math.pow(Math.random(), 3)) * 50;
-        const spreadTheta = Math.random() * Math.PI * 2;
-        positions.push(
-          (r * Math.cos(theta)) + (spread * Math.cos(spreadTheta)),
-          (Math.random() - 0.5) * 15 * Math.exp(-r / 400),
-          (r * Math.sin(theta)) + (spread * Math.sin(spreadTheta))
-        );
-        const color = getStarColor('arm', Math.random() < 0.2);
-        colors.push(...color);
-        sizes.push(1.5 + Math.random());
-      }
-    }
-
-    // Add mid-distance star clusters
-    for (let i = 0; i < midStars; i++) {
-      const phi = Math.random() * Math.PI * 2;
-      const cosTheta = Math.random() * 2 - 1;
-      const theta = Math.acos(cosTheta);
-      const r = GALAXY_LAYERS.MID.SIZE * (0.3 + 0.7 * Math.random());
-      
-      positions.push(
-        r * Math.sin(theta) * Math.cos(phi),
-        r * Math.sin(theta) * Math.sin(phi),
-        r * Math.cos(theta)
-      );
-      const color = getStarColor('distant');
-      colors.push(...color);
-      sizes.push(1 + Math.random());
-    }
-
-    // Add far background stars
-    for (let i = 0; i < farStars; i++) {
-      const phi = Math.random() * Math.PI * 2;
-      const cosTheta = Math.random() * 2 - 1;
-      const theta = Math.acos(cosTheta);
-      const r = GALAXY_LAYERS.FAR.SIZE * (0.5 + 0.5 * Math.random());
-      
-      positions.push(
-        r * Math.sin(theta) * Math.cos(phi),
-        r * Math.sin(theta) * Math.sin(phi),
-        r * Math.cos(theta)
-      );
-      const color = getStarColor('distant');
-      colors.push(...color);
-      sizes.push(0.8 + Math.random() * 0.4);
-    }
-
-    return {
-      positions: new Float32Array(positions),
-      colors: new Float32Array(colors),
-      sizes: new Float32Array(sizes)
-    };
-  }
-
-  function addGalaxyBackground() {
-    if (galaxyPoints) return;
-
-    const { positions, colors, sizes } = createMultiLayerGalaxy();
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-    // Enhanced star shader for better appearance
-    const material = new THREE.ShaderMaterial({
-      uniforms: {
-        opacity: { value: 0 },
-        cameraDist: { value: 0 }
-      },
-      vertexShader: `
-        attribute float size;
-        varying vec3 vColor;
-        uniform float cameraDist;
-        void main() {
-          vColor = color;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          float dist = length(mvPosition.xyz);
-          float scale = cameraDist > 5000.0 ? 1.5 : 1.0;
-          gl_PointSize = size * (300.0 / dist) * scale;
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform float opacity;
-        varying vec3 vColor;
-        void main() {
-          vec2 xy = gl_PointCoord.xy - vec2(0.5);
-          float ll = length(xy);
-          if (ll > 0.5) discard;
-          float alpha = (0.5 - ll) * 2.0 * opacity;
-          gl_FragColor = vec4(vColor, alpha);
-        }
-      `,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending
-    });
-
-    galaxyPoints = new THREE.Points(geometry, material);
-    galaxyPoints.rotation.x = Math.PI / 5.5;
-    scene.add(galaxyPoints);
-  }
-  addGalaxyBackground();
-
-  // Create the sun
-  const sunGeometry = new THREE.SphereGeometry(8.5, 32, 32);
-  const sunMaterial = new THREE.MeshBasicMaterial({ 
-      map: sunTexture
-  });
-  const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-  sun.name = 'sun';
-  sun.userData = { isSun: true };
-  scene.add(sun);
-  
-  // Create all planets
-  planetData.forEach((planet) => {
-    const planetGroup = new THREE.Group();
-    
-    // Create orbit path
-    const orbitGeometry = new THREE.BufferGeometry();
-    const orbitMaterial = new THREE.LineBasicMaterial({ 
-      color: 0x22272a,
-      transparent: true,
-      opacity: 0.33,
-      linewidth: 1
-    });
-    
-    // Generate orbit points
-    const orbitPoints: THREE.Vector3[] = [];
-    const segments = 256;
-    for (let i = 0; i <= segments; i++) {
-      const theta = (i / segments) * Math.PI * 2;
-      orbitPoints.push(
-        new THREE.Vector3(
-          Math.cos(theta) * planet.distanceFromSun,
-          0,
-          Math.sin(theta) * planet.distanceFromSun
-        )
-      );
-    }
-    
-    orbitGeometry.setFromPoints(orbitPoints);
-    const orbit = new THREE.Line(orbitGeometry, orbitMaterial);
-    orbit.userData = { planetId: planet.id };
-    scene.add(orbit);
-    planetOrbits.push({ line: orbit, planetId: planet.id, points: orbitPoints });
-    
-    // Create the planet
-    const planetGeometry = new THREE.SphereGeometry(planet.radius, 32, 32);
-    
-    // Create planet material based on texture
-    const planetMaterial = new THREE.MeshStandardMaterial({
-      map: null,
-      roughness: 0.7,
-      metalness: 0.0
-    });
-    
-    // Load texture asynchronously (this is fine, but loader is now shared)
-    textureLoader.load(`${import.meta.env.BASE_URL}images/${planet.texture}`, (texture) => {
-      planetMaterial.map = texture;
-      planetMaterial.needsUpdate = true;
-    });
-    
-    const planetMesh = new THREE.Mesh(planetGeometry, planetMaterial);
-    planetMesh.name = planet.id;
-    planetGroup.add(planetMesh);
-    planetMeshes[planet.id] = planetMesh;
-    
-    // Calculate initial position
-    const initialAngle = Math.random() * Math.PI * 2;
-    planetGroup.position.x = Math.cos(initialAngle) * planet.distanceFromSun;
-    planetGroup.position.z = Math.sin(initialAngle) * planet.distanceFromSun;
-    
-    // Add rings for Saturn
-    if (planet.id === 'saturn') {
-      const ringGeometry = new THREE.RingGeometry(
-        planet.radius * 1.4, 
-        planet.radius * 2.2, 
-        64
-      );
-      
-      const ringMaterial = new THREE.MeshBasicMaterial({
-        color: 0xc9a97c,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.8
-      });
-      
-      const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
-      ringMesh.rotation.x = Math.PI / 2;
-      planetGroup.add(ringMesh);
-    }
-    
-    // Add moons if the planet has them
-    if (planet.moons && planet.moons.length > 0) {
-      const moonGroup = new THREE.Group();
-      
-      planet.moons.forEach((moon, index) => {
-        const moonGeometry = new THREE.SphereGeometry(moon.radius, 32, 32);
-        const moonMaterial = new THREE.MeshPhongMaterial({ 
-            map: moonTexture
-        });
-        
-        const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
-        
-        // Calculate initial position for the moon
-        const moonDistance = planet.radius * 2 + (index * planet.radius * 0.7);
-        const moonAngle = Math.random() * Math.PI * 2;
-        moonMesh.position.x = Math.cos(moonAngle) * moonDistance;
-        moonMesh.position.z = Math.sin(moonAngle) * moonDistance;
-        
-        // Store the moon's orbital info
-        moonMesh.userData = { 
-          orbitRadius: moonDistance,
-          orbitSpeed: 0.02 + (Math.random() * 0.01),
-          angle: moonAngle
-        };
-        
-        moonGroup.add(moonMesh);
-      });
-      
-      planetGroup.add(moonGroup);
-      moonGroups[planet.id] = moonGroup;
-    }
-    
-    // --- LABELS ---
-    const makeLabel = (text: string) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-      const scale = 2; // Increase resolution
-      ctx.font = `bold ${32 * scale}px Inter, Arial`;
-      const textWidth = ctx.measureText(text).width;
-      canvas.width = (textWidth + 32) * scale;
-      canvas.height = 48 * scale;
-      
-      // Set high-quality text rendering
-      ctx.textBaseline = 'middle';
-      ctx.font = `bold ${32 * scale}px Inter, Arial`;
-      ctx.textAlign = 'center';
-      
-      // Multiple shadow passes for better visibility
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 6 * scale;
-      ctx.fillStyle = '#fff';
-      
-      // Draw text at center of canvas
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      const spriteMaterial = new THREE.SpriteMaterial({ 
-        map: texture,
-        transparent: true
-      });
-      const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.scale.set(text.length * 1.2, 1.2, 1);
-      sprite.position.set(0, planet.radius * 2.2, 0);
-      sprite.visible = !!options?.showLabels;
-      return sprite;
-    };
-    const labelSprite = makeLabel(planet.name);
-    planetGroup.add(labelSprite);
-    labelSprites[planet.id] = labelSprite;
-
-    // Store orbital information in the planet group
-    planetGroup.userData = { 
-      orbitSpeed: planet.orbitSpeed,
-      angle: initialAngle,
-      planetId: planet.id
-    };
-    
-    scene.add(planetGroup);
-    planets.push(planetGroup);
-  });
-  
-  // --- SUN LABEL ---
-  const makeSunLabel = () => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    ctx.font = 'bold 28px Arial';
-    const textWidth = ctx.measureText('Sun').width;
-    canvas.width = textWidth + 24;
-    canvas.height = 38;
-    ctx.font = 'bold 28px Arial';
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = '#000';
-    ctx.shadowBlur = 8;
-    ctx.fillText('Sun', 12, 30);
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
-    const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(10, 3.5, 1); // smaller than before
-    sprite.position.set(0, 10, 0);
-    sprite.visible = !!options?.showLabels;
-    return sprite;
-  };
-  const sunLabel = makeSunLabel();
-  sun.add(sunLabel);
-
-  // --- ORBIT HOVER LOGIC ---
+  // Orbit hover state
   let hoveredOrbit: THREE.Line | null = null;
   let hoveredOrbitId: string | null = null;
   let orbitLabelSprite: THREE.Sprite | null = null;
-  let orbitHoverAnim = 0; // 0 = not hovered, 1 = fully hovered
 
+  // Helper: add starfield background using texture
+  function addStarfieldBackground() {
+    // Create a large sphere to act as skybox
+    const starfieldGeometry = new THREE.SphereGeometry(19000, 32, 32);
+    
+    // Load starfield texture
+    const starfieldTexture = loader.load(`${import.meta.env.BASE_URL}images/stars.jpg`);
+    
+    // Create material and flip it so stars are visible from inside
+    const starfieldMaterial = new THREE.MeshBasicMaterial({
+      map: starfieldTexture,
+      side: THREE.BackSide
+    });
+    
+    const starfieldMesh = new THREE.Mesh(starfieldGeometry, starfieldMaterial);
+    scene.add(starfieldMesh);
+  }
+  
+  // Call starfield instead of procedural stars
+  addStarfieldBackground();
+
+  // Sun mesh
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(8.5, 32, 32), new THREE.MeshBasicMaterial({ map: sunTexture }));
+  sun.name = 'sun';
+  sun.userData = { isSun: true };
+  scene.add(sun);
+
+  // Create planets and moons
+  planetData.forEach((planet) => {
+    const planetGroup = new THREE.Group();
+    // Orbit (visual)
+    const segments = 256;
+    const scaledDistance = planet.distanceFromSun * ORBIT_DISTANCE_SCALE;
+    const orbitPts: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      orbitPts.push(new THREE.Vector3(Math.cos(theta) * scaledDistance, 0, Math.sin(theta) * scaledDistance));
+    }
+    const orbitGeom = new THREE.BufferGeometry().setFromPoints(orbitPts);
+    // Use black orbits by default; keep them slightly translucent
+    const orbitMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.33 });
+    const orbit = new THREE.Line(orbitGeom, orbitMat);
+    orbit.userData = { planetId: planet.id };
+    scene.add(orbit);
+    planetOrbits.push({ line: orbit, planetId: planet.id, points: orbitPts });
+
+    // Planet mesh
+    const planetGeo = new THREE.SphereGeometry(planet.radius, 32, 32);
+    const planetMat = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.0 });
+    loader.load(`${import.meta.env.BASE_URL}images/${planet.texture}`, (t) => { planetMat.map = t; planetMat.needsUpdate = true; });
+    const planetMesh = new THREE.Mesh(planetGeo, planetMat);
+    planetMesh.name = planet.id;
+    planetGroup.add(planetMesh);
+    planetMeshes[planet.id] = planetMesh;
+
+    // Initial planet position on scaled orbit
+    const initialAngle = Math.random() * Math.PI * 2;
+    planetGroup.position.x = Math.cos(initialAngle) * scaledDistance;
+    planetGroup.position.z = Math.sin(initialAngle) * scaledDistance;
+
+    // Saturn rings
+    if (planet.id === 'saturn') {
+      const ringInnerRadius = planet.radius * 1.5;
+      const ringOuterRadius = planet.radius * 2.5;
+
+      const ringGeometry = new THREE.LatheGeometry(
+        [
+          new THREE.Vector2(ringInnerRadius, 0),
+          new THREE.Vector2(ringOuterRadius, 0),
+          new THREE.Vector2(ringOuterRadius, 0.1),
+          new THREE.Vector2(ringInnerRadius, 0.1)
+        ],
+        64
+      );
+
+      // Use the preloaded saturnRingTexture, make it repeat around the ring (U direction)
+      saturnRingTexture.wrapS = THREE.RepeatWrapping;
+      saturnRingTexture.wrapT = THREE.RepeatWrapping;
+      // repeat U (around circumference) more than V (radial) — tweak the first value to change banding density
+      saturnRingTexture.repeat.set(6, 1);
+
+      const ringMaterial = new THREE.MeshStandardMaterial({
+        map: saturnRingTexture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        roughness: 0.8,
+        metalness: 0.0,
+        // alphaTest helps with PNG transparency artifacts
+        alphaTest: 0.05
+      });
+
+      const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+      // Make the ring horizontal (no axial tilt)
+      ringMesh.rotation.x = 0;
+      // Slight offset to avoid z-fighting with the planet
+      ringMesh.position.y = 0.02;
+      ringMesh.renderOrder = 1;
+      planetGroup.add(ringMesh);
+    }
+
+    // Moon creation: prefer authoritative list when available
+    const authoritative = AUTHORITATIVE_MOONS[planet.id];
+    let moonsToUse: { name?: string; radius: number }[] = [];
+    // Prefer visual sizes provided in planetData (these are already small relative to planet)
+    if (planet.moons && planet.moons.length > 0) {
+      moonsToUse = planet.moons.map(m => ({ name: m.name, radius: m.radius }));
+    } else if (Array.isArray(authoritative) && authoritative.length > 0) {
+      // fallback to authoritative (km) list only when planetData has no moons
+      moonsToUse = authoritative.map(m => ({ name: m.name, radius: m.radius }));
+    }
+
+    if (moonsToUse.length > 0) {
+      const moonGroup = new THREE.Group();
+      moonsToUse.forEach((moon, idx) => {
+        // If moon.radius looks like a small visual value (from planetData) use it directly.
+        // If it's a km value (large >50) convert using real ratio but keep it small via AUTH_MOON_VISUAL_SCALE.
+        let visualMoonRadius: number;
+        const moonVal = moon.radius;
+        const planetRealKm = PLANET_REAL_RADII_KM[planet.id];
+        if (typeof moonVal === 'number' && moonVal > 50 && planetRealKm) {
+          const ratio = moonVal / planetRealKm;
+          visualMoonRadius = planet.radius * ratio * AUTH_MOON_VISUAL_SCALE;
+        } else if (typeof moonVal === 'number') {
+          // assume already visual units (these are the "small" originals)
+          visualMoonRadius = Math.max(0.08, moonVal);
+        } else {
+          visualMoonRadius = Math.max(planet.radius * 0.06, 0.08);
+        }
+        // Ensure moon remains clearly smaller than planet (clamp conservatively)
+        visualMoonRadius = Math.min(visualMoonRadius, Math.max(planet.radius * 0.6, planet.radius * 0.08));
+
+        const moonGeo = new THREE.SphereGeometry(visualMoonRadius, 16, 16);
+        const moonMat = new THREE.MeshPhongMaterial({ map: moonTexture });
+        const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+
+        // Orbit radius around planet (local to planetGroup)
+        let moonDistance = planet.radius * MOON_ORBIT_BASE + (idx * planet.radius * 1.1);
+        moonDistance = Math.max(moonDistance, planet.radius + visualMoonRadius + 0.5);
+
+        const moonAngle = Math.random() * Math.PI * 2;
+        moonMesh.position.x = Math.cos(moonAngle) * moonDistance;
+        moonMesh.position.z = Math.sin(moonAngle) * moonDistance;
+
+        moonMesh.userData = {
+          name: moon.name || `moon-${idx}`,
+          parentId: planet.id,
+          realRadiusKm: (typeof moon.radius === 'number' && moon.radius > 50) ? moon.radius : undefined,
+          orbitRadius: moonDistance,
+          orbitSpeed: 0.02 + (Math.random() * 0.02),
+          angle: moonAngle,
+          isMoon: true
+        };
+
+        const moonKey = `${planet.id}:${moonMesh.userData.name}`;
+        moonMeshes[moonKey] = moonMesh;
+        moonGroup.add(moonMesh);
+      });
+
+      planetGroup.add(moonGroup);
+      moonGroups[planet.id] = moonGroup;
+    }
+
+    // Store orbit speed & angle on group
+    planetGroup.userData = { orbitSpeed: planet.orbitSpeed, angle: initialAngle, planetId: planet.id };
+    scene.add(planetGroup);
+    planets.push(planetGroup);
+  });
+
+  // --- ORBIT HOVER & LABELS ---
   function showOrbitLabel(planetId: string) {
     if (orbitLabelSprite) {
       scene.remove(orbitLabelSprite);
@@ -458,433 +307,337 @@ export function setupSolarSystem(
     }
     const planet = planetData.find(p => p.id === planetId);
     if (!planet) return;
-    const length = 2 * Math.PI * planet.distanceFromSun;
-    const text = `Orbit: ${(length * 0.1).toFixed(1)} million km`;
-    
-    // Create high-resolution canvas
+    const radiusKm = (planet.distanceFromSun * ORBIT_DISTANCE_SCALE) * 0.1; // million km units
+    const text = `Radius: ${radiusKm.toFixed(1)} million km`;
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
-    const scale = 2; // Increase resolution
-    ctx.font = `bold ${22 * scale}px Inter, Arial`;
-    const textWidth = ctx.measureText(text).width;
-    canvas.width = (textWidth + 32) * scale;
-    canvas.height = 38 * scale;
-    
-    // Set high-quality text rendering
+    const scale = 3;
+    ctx.font = `bold ${16 * scale}px Inter, Arial`;
+    const padding = 12 * scale;
+    const textWidth = Math.ceil(ctx.measureText(text).width);
+    canvas.width = textWidth + padding * 2;
+    canvas.height = 30 * scale;
+
+    // rounded translucent background
+    const r = 6 * scale;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(canvas.width - r, 0);
+    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, r);
+    ctx.lineTo(canvas.width, canvas.height - r);
+    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - r, canvas.height);
+    ctx.lineTo(r, canvas.height);
+    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // stroke + fill text for clarity
     ctx.textBaseline = 'middle';
-    ctx.font = `bold ${22 * scale}px Inter, Arial`;
     ctx.textAlign = 'center';
-    
-    // Add shadow for better visibility
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = 4 * scale;
-    ctx.fillStyle = '#fff';
-    
-    // Draw text at center of canvas
+    ctx.lineWidth = 1 * scale;
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+    // Use white text when hovering so the label is clearly visible
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${16 * scale}px Inter, Arial`;
+    ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    const spriteMaterial = new THREE.SpriteMaterial({ 
-      map: texture,
-      transparent: true,
-      opacity: 0
-    });
-    orbitLabelSprite = new THREE.Sprite(spriteMaterial);
-    orbitLabelSprite.scale.set(planet.distanceFromSun * 0.38, 6, 1);
-    orbitLabelSprite.position.set(planet.distanceFromSun, 8, 0);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
+    orbitLabelSprite = new THREE.Sprite(mat);
+
+    // size and position: place near orbit at positive X and modest height
+    const w = (planet.distanceFromSun * ORBIT_DISTANCE_SCALE) * 0.26;
+    const h = canvas.height / 40;
+    orbitLabelSprite.scale.set(w, h, 1);
+    orbitLabelSprite.position.set((planet.distanceFromSun * ORBIT_DISTANCE_SCALE), 5.2, 0);
     scene.add(orbitLabelSprite);
+
+    // fade-in quickly
+    let op = 0;
+    const fadeIn = () => {
+      op = Math.min(1, op + 0.15);
+      (orbitLabelSprite!.material as THREE.SpriteMaterial).opacity = op;
+      if (op < 1) requestAnimationFrame(fadeIn);
+    };
+    fadeIn();
   }
 
   function hideOrbitLabel() {
-    if (orbitLabelSprite) {
-      scene.remove(orbitLabelSprite);
-      orbitLabelSprite = null;
-    }
+    if (!orbitLabelSprite) return;
+    // fade-out then remove
+    let op = (orbitLabelSprite.material as THREE.SpriteMaterial).opacity || 1;
+    const fadeOut = () => {
+      op = Math.max(0, op - 0.12);
+      (orbitLabelSprite!.material as THREE.SpriteMaterial).opacity = op;
+      if (op > 0) requestAnimationFrame(fadeOut);
+      else {
+        scene.remove(orbitLabelSprite!);
+        orbitLabelSprite = null;
+      }
+    };
+    fadeOut();
   }
 
   // Robust orbit hover: find closest orbit to mouse ray in 3D
   container.addEventListener('mousemove', (event) => {
     const rect = container.getBoundingClientRect();
-    const mouse = new THREE.Vector2(
+    const mouseN = new THREE.Vector2(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1
     );
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(mouseN, camera);
 
     let minDist = Infinity;
     let foundOrbit: typeof planetOrbits[0] | null = null;
-    let foundPoint: THREE.Vector3 | null = null;
-
     for (const orbitObj of planetOrbits) {
-      // Find closest point on orbit to ray
       for (const pt of orbitObj.points) {
-        const dist = raycaster.ray.distanceToPoint(pt);
+        const dist = rc.ray.distanceToPoint(pt);
         if (dist < minDist) {
           minDist = dist;
           foundOrbit = orbitObj;
-          foundPoint = pt;
         }
       }
     }
 
-    if (foundOrbit && minDist < 2.5) {
+    if (foundOrbit && minDist < 3) {
       if (hoveredOrbit !== foundOrbit.line) {
+        // restore previous (set back to default black + low opacity)
         if (hoveredOrbit) {
-          (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0x22272a);
+          (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0x000000);
           (hoveredOrbit.material as THREE.LineBasicMaterial).opacity = 0.33;
         }
         hoveredOrbit = foundOrbit.line;
         hoveredOrbitId = foundOrbit.planetId;
+        // highlight hovered orbit (bright and more opaque)
         (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0xffffff);
-        (hoveredOrbit.material as THREE.LineBasicMaterial).opacity = 0.85;
-        orbitHoverAnim = 0;
+        (hoveredOrbit.material as THREE.LineBasicMaterial).opacity = 0.9;
         showOrbitLabel(foundOrbit.planetId);
       }
     } else if (hoveredOrbit) {
-      (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0x22272a);
+      // restore to default black + low opacity
+      (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0x000000);
       (hoveredOrbit.material as THREE.LineBasicMaterial).opacity = 0.33;
       hoveredOrbit = null;
       hoveredOrbitId = null;
-      orbitHoverAnim = 0;
       hideOrbitLabel();
     }
   });
 
   container.addEventListener('mouseleave', () => {
     if (hoveredOrbit) {
-      (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0x22272a);
+      (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0x000000);
       (hoveredOrbit.material as THREE.LineBasicMaterial).opacity = 0.33;
       hoveredOrbit = null;
       hoveredOrbitId = null;
-      orbitHoverAnim = 0;
     }
     hideOrbitLabel();
   });
 
-  // Set up raycaster for planet clicking
+  // Raycaster for clicks
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
-  
-  // Mouse event listener for clicking planets
-  container.addEventListener('click', (event) => {
-    // Convert mouse position to normalized device coordinates
-    mouse.x = (event.clientX / container.clientWidth) * 2 - 1;
-    mouse.y = -(event.clientY / container.clientHeight) * 2 + 1;
-    
-    // Set up the raycaster
-    raycaster.setFromCamera(mouse, camera);
-    
-    // Get all the planet meshes to check for intersections
-    const planetMeshList = [...Object.values(planetMeshes), sun];
-    const intersects = raycaster.intersectObjects(planetMeshList);
-    
-    if (intersects.length > 0) {
-      // Get the first intersected object
-      const clickedMesh = intersects[0].object as THREE.Mesh;
-      
-      if (clickedMesh.userData.isSun) {
-        onPlanetClick({ id: 'sun' });
-        return;
-      }
 
-      // Find which planet this is
-      const clickedPlanetId = Object.keys(planetMeshes).find(
-        key => planetMeshes[key] === clickedMesh
-      );
-      
-      if (clickedPlanetId) {
-        const clickedPlanet = planetData.find(p => p.id === clickedPlanetId);
-        if (clickedPlanet) {
-          // Focus camera on the planet
-          focusCameraOnPlanet(clickedPlanet);
-          
-          // Call the click handler
-          onPlanetClick(clickedPlanet);
-        }
+  container.addEventListener('click', (event) => {
+    const rect = container.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const pickables = [...Object.values(planetMeshes), ...Object.values(moonMeshes), sun];
+    const intersects = raycaster.intersectObjects(pickables);
+    if (intersects.length === 0) return;
+    const clicked = intersects[0].object as THREE.Mesh;
+
+    // Sun clicked
+    if ((clicked.userData && clicked.userData.isSun) || clicked === sun) {
+      onPlanetClick({
+        id: 'sun',
+        name: 'Sun',
+        radius: 8.5,
+        distanceFromSun: 0,
+        orbitSpeed: 0,
+        texture: 'sun.jpg',
+        description: 'The Sun is the star at the center of the Solar System.',
+        diameter: 1391400,
+        mass: '1.989 × 10^30 kg',
+        dayLength: '25 days (equator)',
+        yearLength: '—',
+        avgTemp: '5,505°C (surface)',
+        funFact: 'The Sun contains 99.86% of the mass in the Solar System!',
+        moons: []
+      });
+      return;
+    }
+
+    // Planet clicked
+    const planetKey = Object.keys(planetMeshes).find(k => planetMeshes[k] === clicked);
+    if (planetKey) {
+      const pd = planetData.find(p => p.id === planetKey);
+      if (pd) {
+        // focus camera (simple) and dispatch
+        focusCameraOnPlanet(pd);
+        onPlanetClick(pd);
       }
+      return;
+    }
+
+    // Moon clicked
+    const moonKey = Object.keys(moonMeshes).find(k => moonMeshes[k] === clicked);
+    if (moonKey) {
+      const md = moonMeshes[moonKey].userData;
+      const parent = planetData.find(p => p.id === md.parentId);
+      // build a PlanetData-like payload so InfoPanel shows
+      const visualRadius = (clicked.geometry as THREE.SphereGeometry).parameters.radius;
+      const moonPayload: PlanetData = {
+        id: `${md.parentId}-${md.name}`,
+        name: md.name,
+        radius: visualRadius,
+        distanceFromSun: parent ? parent.distanceFromSun : 0,
+        orbitSpeed: md.orbitSpeed ?? 0,
+        texture: 'moon.jpg',
+        description: `Moon of ${parent ? parent.name : md.parentId}.`,
+        diameter: md.realRadiusKm ? Math.round(md.realRadiusKm * 2) : Math.round(visualRadius * 1000),
+        mass: '—',
+        dayLength: '—',
+        yearLength: '—',
+        avgTemp: '—',
+        funFact: `Click Learn More to search NASA about ${md.name}.`,
+        moons: []
+      };
+      // focus on parent planet first for context
+      if (parent) focusCameraOnPlanet(parent);
+      onPlanetClick(moonPayload);
+      return;
     }
   });
-  
-  // Focus camera on a specific planet with animation
+
+  // Focus helper (simple animated lerp)
   function focusCameraOnPlanet(planet: PlanetData) {
-    const planetMesh = planetMeshes[planet.id];
-    if (!planetMesh) return;
-    
-    // Get planet world position
-    const planetPosition = new THREE.Vector3();
-    planetMesh.getWorldPosition(planetPosition);
-    
-    // Calculate target position for camera (slightly offset from planet)
-    const targetPosition = planetPosition.clone().add(
-      new THREE.Vector3(planet.radius * 5, planet.radius * 3, planet.radius * 5)
-    );
-    
-    // Calculate distance from camera to planet for zoom level
-    const distance = planet.radius * 10;
-    
-    // Animate camera position
-    animateCameraMove(targetPosition, planetPosition, distance);
-  }
-  
-  // Animate the camera movement to focus on a planet
-  function animateCameraMove(
-    targetPosition: THREE.Vector3,
-    lookAtPosition: THREE.Vector3,
-    distance: number
-  ) {
-    const startPosition = camera.position.clone();
-    const startLookAt = controls.target.clone();
-    const duration = 1500; // ms
-    const startTime = Date.now();
-    
-    function updateCamera() {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // Ease in/out function
-      const easedProgress = progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-      
-      // Update camera position
-      camera.position.lerpVectors(startPosition, targetPosition, easedProgress);
-      
-      // Update controls target (what the camera looks at)
-      controls.target.lerpVectors(startLookAt, lookAtPosition, easedProgress);
+    const mesh = planetMeshes[planet.id];
+    if (!mesh) return;
+    const worldPos = new THREE.Vector3();
+    mesh.getWorldPosition(worldPos);
+    const targetPos = worldPos.clone().add(new THREE.Vector3(planet.radius * 6, planet.radius * 3, planet.radius * 6));
+    const startPos = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const duration = 900;
+    const t0 = Date.now();
+    function step() {
+      const t = Math.min(1, (Date.now() - t0) / duration);
+      camera.position.lerpVectors(startPos, targetPos, t);
+      controls.target.lerpVectors(startTarget, worldPos, t);
       controls.update();
-      
-      if (progress < 1) {
-        requestAnimationFrame(updateCamera);
-      }
+      if (t < 1) requestAnimationFrame(step);
     }
-    
-    updateCamera();
+    step();
   }
-  
-  // Add stars to the background
-  function addStarsBackground(scene: THREE.Scene) {
-    const starsGeometry = new THREE.BufferGeometry();
-    const starsMaterial = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.7,
-      transparent: true
-    });
-    
-    const starsVertices = [];
-    for (let i = 0; i < 3000; i++) {
-      const x = THREE.MathUtils.randFloatSpread(1000);
-      const y = THREE.MathUtils.randFloatSpread(1000);
-      const z = THREE.MathUtils.randFloatSpread(1000);
-      starsVertices.push(x, y, z);
-    }
-    
-    starsGeometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(starsVertices, 3)
-    );
-    
-    const stars = new THREE.Points(starsGeometry, starsMaterial);
-    scene.add(stars);
-  }
-  
-  // --- CONTROL MOONS VISIBILITY ---
-  function setMoonsVisible(visible: boolean) {
-    Object.values(moonGroups).forEach(group => {
-      group.visible = visible;
-    });
-  }
-  setMoonsVisible(!(options?.hideMoons ?? false));
 
-  // --- CONTROL LABELS VISIBILITY ---
-  function setLabelsVisible(visible: boolean) {
-    Object.values(labelSprites).forEach(sprite => {
-      sprite.visible = visible;
-    });
-    sunLabel.visible = visible;
-  }
-  setLabelsVisible(!!options?.showLabels);
-
-  // --- CONTROL PLANET SCALE ---
-  function setPlanetScale(scale: number) {
-    currentPlanetScale = scale;
-    Object.entries(planetMeshes).forEach(([id, mesh]) => {
-      const baseRadius = planetData.find(p => p.id === id)?.radius ?? 1;
-      mesh.scale.set(scale, scale, scale);
-      // Also update label position and scale
-      const label = labelSprites[id];
-      if (label) {
-        label.position.set(0, baseRadius * 2.2 * scale, 0);
-        label.scale.set(baseRadius * 3 * scale, baseRadius * 1 * scale, 1);
-      }
-    });
-  }
-  setPlanetScale(options?.planetScale ?? 1);
-
-  // --- CAMERA ZOOM CONTROL WITH SMOOTH MOTION ---
-  let zoomTargetDistance: number | null = null;
-  let zoomLerpAlpha = 0.12; // Smoothness
-
-  function getCameraDistance() {
-    return camera.position.length();
-  }
-  function setCameraDistance(distance: number) {
-    zoomTargetDistance = distance;
-  }
-  function zoomIn() {
-    const dist = getCameraDistance();
-    const factor = dist > 1000 ? 0.8 : 0.7; // Gentler zoom at far distances
-    setCameraDistance(Math.max(30, dist * factor));
-  }
-  function zoomOut() {
-    const dist = getCameraDistance();
-    const factor = dist > 1000 ? 1.2 : 1.4; // Gentler zoom at far distances
-    setCameraDistance(Math.min(controls.maxDistance - 10, dist * factor));
+  // Update simulation speed externally
+  function updateSimulationSpeed(speed: number) {
+    simulationSpeed = speed;
   }
 
   // Animation loop
   function animate() {
     requestAnimationFrame(animate);
-    
-    // --- Smooth camera zoom ---
-    if (zoomTargetDistance !== null) {
-      const current = getCameraDistance();
-      const target = zoomTargetDistance;
-      if (Math.abs(current - target) > 0.5) {
-        const dir = camera.position.clone().normalize();
-        const newDist = THREE.MathUtils.lerp(current, target, zoomLerpAlpha);
-        camera.position.copy(dir.multiplyScalar(newDist));
-        camera.updateProjectionMatrix();
-        controls.update();
-      } else {
-        zoomTargetDistance = null;
-      }
-    }
-
-    // Update planets position based on orbit
-    planets.forEach((planet) => {
-      // Update planet position
-      const speed = planet.userData.orbitSpeed * simulationSpeed;
-      planet.userData.angle += speed;
-      
-      const distance = planet.position.length();
-      planet.position.x = Math.cos(planet.userData.angle) * distance;
-      planet.position.z = Math.sin(planet.userData.angle) * distance;
-      
-      // Rotate the planet
-      const planetId = planet.userData.planetId;
-      const planetObj = planetMeshes[planetId];
-      if (planetObj) {
-        planetObj.rotation.y += 0.01 * simulationSpeed;
-      }
-      
-      // Apply scale if changed
-      planet.scale.set(currentPlanetScale, currentPlanetScale, currentPlanetScale);
-
-      // Update moons if this planet has any
-      const moonGroup = moonGroups[planetId];
-      if (moonGroup) {
-        moonGroup.children.forEach((moon) => {
-          const moonData = moon.userData;
-          moonData.angle += moonData.orbitSpeed * simulationSpeed;
-          
-          moon.position.x = Math.cos(moonData.angle) * moonData.orbitRadius;
-          moon.position.z = Math.sin(moonData.angle) * moonData.orbitRadius;
+    // Update planets
+    planets.forEach((pg) => {
+      const speed = (pg.userData.orbitSpeed ?? 0) * simulationSpeed;
+      pg.userData.angle += speed;
+      const dist = pg.position.length();
+      pg.position.x = Math.cos(pg.userData.angle) * dist;
+      pg.position.z = Math.sin(pg.userData.angle) * dist;
+      // Rotate planet mesh
+      const pid = pg.userData.planetId;
+      const pm = planetMeshes[pid];
+      if (pm) pm.rotation.y += 0.01 * simulationSpeed;
+      // Moons
+      const mg = moonGroups[pid];
+      if (mg) {
+        mg.children.forEach((m: any) => {
+          m.userData.angle += (m.userData.orbitSpeed ?? 0) * simulationSpeed;
+          m.position.x = Math.cos(m.userData.angle) * m.userData.orbitRadius;
+          m.position.z = Math.sin(m.userData.angle) * m.userData.orbitRadius;
         });
       }
     });
 
-    // Animate orbit hover (boldness and label fade)
-    if (hoveredOrbit) {
-      orbitHoverAnim = Math.min(1, orbitHoverAnim + 0.08);
-      (hoveredOrbit.material as THREE.LineBasicMaterial).linewidth = 2 + 2 * orbitHoverAnim;
-      if (orbitLabelSprite) {
-        orbitLabelSprite.material.opacity = orbitHoverAnim;
-        orbitLabelSprite.scale.y = 6 + 2 * Math.sin(orbitHoverAnim * Math.PI) * 0.5;
-      }
-    } else {
-      orbitHoverAnim = Math.max(0, orbitHoverAnim - 0.08);
-      if (orbitLabelSprite) {
-        orbitLabelSprite.material.opacity = orbitHoverAnim;
-        orbitLabelSprite.scale.y = 6 + 2 * Math.sin(orbitHoverAnim * Math.PI) * 0.5;
-        if (orbitHoverAnim === 0) hideOrbitLabel();
-      }
-    }
-
-    // --- GALAXY VISIBILITY & STAR MORPHING ---
-    if (galaxyPoints) {
-      const camDist = getCameraDistance();
-      let opacity = 0;
-      
-      // Progressive fade-in based on distance
-      if (camDist > GALAXY_LAYERS.CLOSE.START) {
-        if (camDist < GALAXY_LAYERS.CLOSE.END) {
-          opacity = (camDist - GALAXY_LAYERS.CLOSE.START) / 
-                   (GALAXY_LAYERS.CLOSE.END - GALAXY_LAYERS.CLOSE.START);
-        } else if (camDist < GALAXY_LAYERS.MID.END) {
-          opacity = 1;
-        } else {
-          opacity = 1 - Math.min(1, (camDist - GALAXY_LAYERS.MID.END) / 
-                   (GALAXY_LAYERS.FAR.END - GALAXY_LAYERS.MID.END));
-        }
-      }
-
-      const material = galaxyPoints.material as THREE.ShaderMaterial;
-      material.uniforms.opacity.value += (opacity - material.uniforms.opacity.value) * 0.05;
-      material.uniforms.cameraDist.value = camDist;
-      
-      galaxyPoints.rotation.y += 0.0001;
-      galaxyVisible = material.uniforms.opacity.value > 0.05;
-    }
-    
-    // Update controls
     controls.update();
-    
-    // Render scene
     renderer.render(scene, camera);
   }
-  
-  // Handle window resize
+  animate();
+
+  // Resize handler
   function handleResize() {
     camera.aspect = container.clientWidth / container.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);
   }
-  
   window.addEventListener('resize', handleResize);
-  
-  // Select planet by ID
-  function selectPlanet(planetId: string) {
-    const planet = planetData.find(p => p.id === planetId);
-    if (planet) {
-      focusCameraOnPlanet(planet);
-    }
+
+  // Visibility & scale controls
+  function setMoonsVisible(visible: boolean) {
+    Object.values(moonGroups).forEach(g => g.visible = visible);
   }
-  
-  // Cleanup function
+  setMoonsVisible(!(options?.hideMoons ?? false));
+
+  function setLabelsVisible(_: boolean) {
+    // labels not implemented in this trimmed version
+  }
+
+  function setPlanetScale(scale: number) {
+    currentPlanetScale = scale;
+    Object.values(planetMeshes).forEach((m) => m.scale.set(scale, scale, scale));
+  }
+  setPlanetScale(options?.planetScale ?? 1);
+
+  // Zoom helpers (simple)
+  function getCameraDistance() { return camera.position.length(); }
+  let zoomTarget: number | null = null;
+  function setCameraDistance(distance: number) { zoomTarget = distance; }
+  function zoomIn() { setCameraDistance(Math.max(30, getCameraDistance() * 0.7)); }
+  function zoomOut() { setCameraDistance(Math.min(controls.maxDistance - 10, getCameraDistance() * 1.4)); }
+
+  // Smooth zoom step integrated into animate via controls update
+  // (cheap approach: update camera toward zoomTarget)
+  const origAnimate = animate;
+  // Already animating; add a simple interval to lerp camera if zoomTarget set
+  (function smoothZoomStep() {
+    requestAnimationFrame(smoothZoomStep);
+    if (zoomTarget !== null) {
+      const cur = getCameraDistance();
+      if (Math.abs(cur - zoomTarget) > 0.5) {
+        const dir = camera.position.clone().normalize();
+        const newDist = THREE.MathUtils.lerp(cur, zoomTarget, 0.12);
+        camera.position.copy(dir.multiplyScalar(newDist));
+        controls.update();
+      } else zoomTarget = null;
+    }
+  })();
+
+  // Cleanup
   function cleanupScene() {
     window.removeEventListener('resize', handleResize);
     renderer.dispose();
-    
-    // Remove all event listeners
     container.innerHTML = '';
-    
-    // Remove global reference
-    delete window.solarSystem;
+    delete (window as any).solarSystem;
   }
-  
-  // Start animation
-  animate();
-  
-  // Expose API for external access
-  window.solarSystem = {
-    updateSimulationSpeed
-  };
-  
+
+  // Expose API
+  (window as any).solarSystem = { updateSimulationSpeed };
   return {
-    selectPlanet,
+    selectPlanet: (planetId: string) => {
+      const p = planetData.find(p => p.id === planetId);
+      if (p) focusCameraOnPlanet(p);
+    },
     updateSimulationSpeed,
     cleanupScene,
     setMoonsVisible,
@@ -893,6 +646,6 @@ export function setupSolarSystem(
     zoomIn,
     zoomOut,
     getCameraDistance,
-    isGalaxyVisible: () => galaxyVisible
+    isGalaxyVisible: () => false
   };
 }

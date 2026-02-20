@@ -34,9 +34,16 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     neptune: 'https://science.nasa.gov/neptune/',
     sun: 'https://science.nasa.gov/sun/'
   };
-  const nasaUrl = nasaLinks[planet.id.toLowerCase()] || 'https://science.nasa.gov/solar-system/';
+  let nasaUrl = nasaLinks[planet.id.toLowerCase()] || 'https://science.nasa.gov/solar-system/';
+  // For moons, prefer a NASA search link for the moon name (better coverage)
+  if ((planet as any).isMoon || (planet as any).parentId) {
+    nasaUrl = `https://www.nasa.gov/search?q=${encodeURIComponent(planet.name)}`;
+  }
+  
+   const [loading, setLoading] = useState(false);
 
-  const [loading, setLoading] = useState(false);
+  const parentId = (planet as any).parentId;
+  const parentLabel = parentId ? ` • Satellite of ${parentId}` : '';
 
   return (
     <div className="absolute top-20 right-5 w-80 bg-black/90 backdrop-blur-md text-white rounded-2xl overflow-hidden z-20 shadow-2xl border border-white/10 animate-slideIn transition-all duration-500">
@@ -49,7 +56,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         </button>
         
         <div className="p-5">
-          <h2 className="text-2xl font-bold mb-1">{planet.name}</h2>
+          <h2 className="text-2xl font-bold mb-1">{planet.name}{parentLabel}</h2>
           <div className="w-full h-0.5 bg-white/20 mb-4"></div>
           
           {showComparison && (
