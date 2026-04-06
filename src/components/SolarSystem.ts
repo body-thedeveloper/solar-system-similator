@@ -21,6 +21,8 @@ export function setupSolarSystem(
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowShadowMap;
   container.appendChild(renderer.domElement);
 
   // Camera & controls
@@ -36,13 +38,17 @@ export function setupSolarSystem(
   scene.add(new THREE.AmbientLight(0x111111));
   const sunLight = new THREE.PointLight(0xffffff, 2, 1000, 0.5);
   sunLight.position.set(0, 0, 0);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 2048;
+  sunLight.shadow.mapSize.height = 2048;
+  sunLight.shadow.radius = 2;
   scene.add(sunLight);
 
   // Loaders & textures
   const loader = new THREE.TextureLoader();
   const sunTexture = loader.load(`${import.meta.env.BASE_URL}images/sun.jpg`);
   const moonTexture = loader.load(`${import.meta.env.BASE_URL}images/moon.jpg`);
-  const saturnRingTexture = loader.load(`${import.meta.env.BASE_URL}images/saturn_ring.png`);
+  const saturnRingTexture = loader.load(`${import.meta.env.BASE_URL}images/saturn_ring1.png`);
 
   // Configuration constants
   const ORBIT_DISTANCE_SCALE = 1.8;    // spread planetary orbits
@@ -179,9 +185,12 @@ export function setupSolarSystem(
 
     // Planet mesh
     const planetGeo = new THREE.SphereGeometry(planet.radius, 32, 32);
-    const planetMat = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.0 });
+    const planetMat = new THREE.MeshBasicMaterial({ toneMapped: false });
+    planetMat.emissiveIntensity = 0.1;
     loader.load(`${import.meta.env.BASE_URL}images/${planet.texture}`, (t) => { planetMat.map = t; planetMat.needsUpdate = true; });
     const planetMesh = new THREE.Mesh(planetGeo, planetMat);
+    planetMesh.castShadow = true;
+    planetMesh.receiveShadow = true;
     planetMesh.name = planet.id;
     planetGroup.add(planetMesh);
     planetMeshes[planet.id] = planetMesh;
@@ -212,17 +221,17 @@ export function setupSolarSystem(
       // repeat U (around circumference) more than V (radial) — tweak the first value to change banding density
       saturnRingTexture.repeat.set(6, 1);
 
-      const ringMaterial = new THREE.MeshStandardMaterial({
+      const ringMaterial = new THREE.MeshBasicMaterial({
         map: saturnRingTexture,
         transparent: true,
         side: THREE.DoubleSide,
-        roughness: 0.8,
-        metalness: 0.0,
-        // alphaTest helps with PNG transparency artifacts
         alphaTest: 0.05
       });
+      ringMaterial.emissiveIntensity = 0.3;
 
       const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+      ringMesh.castShadow = true;
+      ringMesh.receiveShadow = true;
       // Make the ring horizontal (no axial tilt)
       ringMesh.rotation.x = 0;
       // Slight offset to avoid z-fighting with the planet
@@ -263,8 +272,11 @@ export function setupSolarSystem(
         visualMoonRadius = Math.min(visualMoonRadius, Math.max(planet.radius * 0.6, planet.radius * 0.08));
 
         const moonGeo = new THREE.SphereGeometry(visualMoonRadius, 16, 16);
-        const moonMat = new THREE.MeshPhongMaterial({ map: moonTexture });
+        const moonMat = new THREE.MeshBasicMaterial({ map: moonTexture });
+        moonMat.emissiveIntensity = 0.3;
         const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+        moonMesh.castShadow = true;
+        moonMesh.receiveShadow = true;
 
         // Orbit radius around planet (local to planetGroup)
         let moonDistance = planet.radius * MOON_ORBIT_BASE + (idx * planet.radius * 1.1);
