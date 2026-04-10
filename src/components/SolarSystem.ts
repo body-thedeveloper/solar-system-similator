@@ -14,7 +14,7 @@ declare global {
 export function setupSolarSystem(
   container: HTMLDivElement,
   onPlanetClick: (planet: PlanetData | { id: 'sun', [key: string]: any }) => void,
-  options?: { hideMoons?: boolean; showLabels?: boolean; planetScale?: number }
+  options?: { hideMoons?: boolean; showLabels?: boolean; planetScale?: number; tFunc?: (key: any) => string; currentLanguage?: 'en' | 'ar' }
 ) {
   // Scene & renderer
   const scene = new THREE.Scene();
@@ -320,16 +320,20 @@ export function setupSolarSystem(
     const planet = planetData.find(p => p.id === planetId);
     if (!planet) return;
     const radiusKm = (planet.distanceFromSun * ORBIT_DISTANCE_SCALE) * 0.1; // million km units
-    const text = `Radius: ${radiusKm.toFixed(1)} million km`;
+    const radiusLabel = options?.tFunc ? options.tFunc('radius') : 'Radius';
+    const millionKmLabel = options?.tFunc ? options.tFunc('millionKm') : 'million km';
+    const text = `${radiusLabel}: ${radiusKm.toFixed(1)} ${millionKmLabel}`;
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
-    const scale = 3;
-    ctx.font = `bold ${16 * scale}px Inter, Arial`;
-    const padding = 12 * scale;
+    const scale = 4;
+    const fontFamily = options?.currentLanguage === 'ar' ? 'Cairo' : 'Inter';
+    ctx.font = `bold ${18 * scale}px ${fontFamily}, Arial`;
+    const padding = 16 * scale;
     const textWidth = Math.ceil(ctx.measureText(text).width);
-    canvas.width = textWidth + padding * 2;
-    canvas.height = 30 * scale;
+    const textHeight = Math.ceil(18 * scale * 1.4);
+    canvas.width = Math.max(textWidth + padding * 2, 180);
+    canvas.height = textHeight + padding * 1.5;
 
     // rounded translucent background
     const r = 6 * scale;
@@ -354,7 +358,6 @@ export function setupSolarSystem(
     ctx.strokeStyle = 'rgba(0,0,0,0.65)';
     // Use white text when hovering so the label is clearly visible
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${16 * scale}px Inter, Arial`;
     ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 

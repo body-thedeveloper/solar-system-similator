@@ -1,0 +1,258 @@
+export const translations = {
+  en: {
+    // Common
+    ok: 'OK',
+    close: 'Close',
+    english: 'English',
+    arabic: 'عربي',
+    radius: 'Radius',
+    millionKm: 'million km',
+
+    // Loading Screen
+    selectLanguage: 'Select Language',
+    chooseLanguage: 'Please choose your preferred language',
+
+    // Speed Control
+    simulationSpeed: 'Simulation Speed',
+    slow: 'Slow',
+    fast: 'Fast',
+    pause: 'Pause',
+    play: 'Play',
+    hideMoons: 'Hide Moons',
+    showMoons: 'Show Moons',
+    showLabels: 'Show Labels',
+    hideLabels: 'Hide Labels',
+    planetScale: 'Planet Scale',
+
+    // Info Panel
+    satelliteOf: 'Satellite of',
+    chosenAsA: 'Chosen as A',
+    chooseAsA: 'Choose as A',
+    chosenAsB: 'Chosen as B',
+    chooseAsB: 'Choose as B',
+    diameter: 'Diameter',
+    mass: 'Mass',
+    dayLength: 'Day Length',
+    yearLength: 'Year Length',
+    avgTemp: 'Avg Temperature',
+    funFact: 'Fun Fact',
+    learnMore: 'Learn More on NASA',
+    satellites: 'Satellites',
+    distanceFromSun: 'Distance from Sun',
+    more: 'more',
+    
+    // Time Units
+    hours: 'hours',
+    minutes: 'minutes',
+    seconds: 'seconds',
+    days: 'days',
+    earthDays: 'Earth days',
+    earthYears: 'Earth years',
+
+    // Comparison Panel
+    comparisonMode: 'Comparison Mode',
+    planet: 'Planet',
+    planetComparison: 'Planet Comparison',
+    comparePlanets: 'Compare Planets',
+    selectTwoPlanets: 'Select two planets to compare',
+    exitComparison: 'Exit Comparison',
+    noComparison: 'No planets selected for comparison',
+
+    // Planet Names
+    sun: 'Sun',
+    mercury: 'Mercury',
+    venus: 'Venus',
+    earth: 'Earth',
+    mars: 'Mars',
+    jupiter: 'Jupiter',
+    saturn: 'Saturn',
+    uranus: 'Uranus',
+    neptune: 'Neptune',
+
+    // Comparison Properties
+    name: 'Name',
+    property: 'Property',
+    selectPlanetA: 'Select Planet A',
+    selectPlanetB: 'Select Planet B',
+    clickAPlanet: 'Click a planet',
+    comparisonResults: 'Comparison Results',
+    sizeDifference: 'Size difference',
+    orbitalSpeedRatio: 'Orbital speed ratio',
+    distanceBetweenPlanets: 'Distance between planets',
+    larger: 'larger',
+    smaller: 'smaller',
+    than: 'than',
+    million: 'million',
+    is: 'is',
+    times: 'times',
+    approximately: 'Approximately',
+    kilometers: 'kilometers',
+    faster: 'faster',
+    slower: 'slower',
+    orbitalSpeed: 'Orbital Speed',
+    avgTemperature: 'Average Temperature',
+    numberOfMoons: 'Number of Moons',
+    moons: 'Moons',
+    sameSizeMoons: 'Same size',
+    reset: 'Reset',
+
+    // Descriptions
+    sunDescription: 'The Sun is the star at the center of the Solar System. It is a nearly perfect sphere of hot plasma and is by far the most important source of energy for life on Earth.',
+    mercuryDescription: 'Mercury is the smallest and innermost planet in the Solar System. It has a rocky body like Earth but is much smaller, with a diameter of about 4,880 km.',
+    venusDescription: "Venus is the second planet from the Sun and is Earth's closest planetary neighbor. It's one of the four inner, terrestrial planets.",
+    earthDescription: 'Earth is the third planet from the Sun and the only astronomical object known to harbor life. It is the only world in our solar system with liquid water on the surface.',
+    marsDescription: 'Mars is the fourth planet from the Sun and the second-smallest planet in the Solar System, being larger than only Mercury. It is often referred to as the "Red Planet".',
+    jupiterDescription: 'Jupiter is the fifth planet from the Sun and is significantly the largest planet in the Solar System. It is twice as massive as all other planets combined.',
+    saturnDescription: 'Saturn is the sixth planet from the Sun. It is famous for its prominent ring system, which is the most extensive planetary ring system of any planet.',
+    uranusDescription: 'Uranus is the seventh planet from the Sun. It is a unique ice giant that rotates on its side, with an axial tilt of 98 degrees.',
+    neptuneDescription: 'Neptune is the eighth planet from the Sun and is the most distant planet in our solar system. It is the windiest planet known, with wind speeds reaching 2,100 km/h.',
+
+    // Fun Facts
+    sunFunFact: 'The Sun contains 99.86% of the mass in the Solar System!',
+    mercuryFunFact: 'Mercury has wrinkles! As the iron core of the planet cooled and contracted, the surface developed "wrinkles" or compressional features.',
+    venusFunFact: 'Venus rotates in the opposite direction to most planets, meaning the Sun rises in the west and sets in the east.',
+    earthFunFact: "The Earth's rotation is gradually slowing. This deceleration is happening almost imperceptibly, at approximately 17 milliseconds per hundred years.",
+    marsFunFact: 'Mars has the largest volcano in the Solar System - Olympus Mons - which is about 21 km high.',
+    jupiterFunFact: 'Jupiter is so large that all other planets can fit inside it!',
+    saturnFunFact: 'Saturn\'s rings contain countless particles of ice and rock, ranging in size from a grain of sand to a skyscraper.',
+    uranusFunFact: 'Uranus appears as a featureless ball of cyan-colored clouds, making it one of the most boring looking planets visually.',
+    neptuneFunFact: 'Neptune\'s winds are three times stronger than Jupiter\'s, making it the windiest place in the Solar System.',
+  },
+  ar: {
+    // Common
+    ok: 'موافق',
+    close: 'إغلاق',
+    english: 'English',
+    arabic: 'عربي',
+    radius: 'نصف القطر',
+    millionKm: 'مليون كم',
+
+    // Loading Screen
+    selectLanguage: 'اختر اللغة',
+    chooseLanguage: 'يرجى اختيار اللغة المفضلة لديك',
+
+    // Speed Control
+    simulationSpeed: 'سرعة المحاكاة',
+    slow: 'بطيء',
+    fast: 'سريع',
+    pause: 'إيقاف مؤقت',
+    play: 'تشغيل',
+    hideMoons: 'إخفاء الأقمار',
+    showMoons: 'إظهار الأقمار',
+    showLabels: 'إظهار التسميات',
+    hideLabels: 'إخفاء التسميات',
+    planetScale: 'مقياس الكواكب',
+
+    // Info Panel
+    satelliteOf: 'قمر صناعي لـ',
+    chosenAsA: 'تم اختياره كـ A',
+    chooseAsA: 'اختر كـ A',
+    chosenAsB: 'تم اختياره كـ B',
+    chooseAsB: 'اختر كـ B',
+    diameter: 'القطر',
+    mass: 'الكتلة',
+    dayLength: 'طول اليوم',
+    yearLength: 'طول السنة',
+    avgTemp: 'متوسط الحرارة',
+    funFact: 'حقيقة مثيرة للاهتمام',
+    learnMore: 'تعرف على المزيد من ناسا',
+    satellites: 'الأقمار الصناعية',
+    distanceFromSun: 'المسافة من الشمس',
+    more: 'أكثر',
+    
+    // Time Units
+    hours: 'ساعات',
+    minutes: 'دقائق',
+    seconds: 'ثواني',
+    days: 'أيام',
+    earthDays: 'أيام أرضية',
+    earthYears: 'سنوات أرضية',
+
+    // Comparison Panel
+    comparisonMode: 'وضع المقارنة',
+    planet: 'الكوكب',
+    planetComparison: 'مقارنة الكواكب',
+    comparePlanets: 'مقارنة الكواكب',
+    selectTwoPlanets: 'اختر كوكبين للمقارنة',
+    exitComparison: 'خروج من المقارنة',
+    noComparison: 'لم يتم اختيار أي كواكب للمقارنة',
+
+    // Planet Names
+    sun: 'الشمس',
+    mercury: 'عطارد',
+    venus: 'الزهرة',
+    earth: 'الأرض',
+    mars: 'المريخ',
+    jupiter: 'المشتري',
+    saturn: 'زحل',
+    uranus: 'أورانوس',
+    neptune: 'نبتون',
+
+    // Comparison Properties
+    name: 'الاسم',
+    property: 'الخاصية',
+    selectPlanetA: 'اختر الكوكب A',
+    selectPlanetB: 'اختر الكوكب B',
+    clickAPlanet: 'انقر على كوكب',
+    comparisonResults: 'نتائج المقارنة',
+    sizeDifference: 'الفرق في الحجم',
+    orbitalSpeedRatio: 'نسبة السرعة المدارية',
+    distanceBetweenPlanets: 'المسافة بين الكواكب',
+    larger: 'أكبر',
+    smaller: 'أصغر',
+    than: 'من',
+    million: 'مليون',
+    is: 'هي',
+    times: 'مرة',
+    approximately: 'تقريبا',
+    kilometers: 'كيلومتر',
+    faster: 'أسرع',
+    slower: 'أبطأ',
+    orbitalSpeed: 'السرعة المدارية',
+    avgTemperature: 'متوسط درجة الحرارة',
+    numberOfMoons: 'عدد الأقمار',
+    moons: 'الأقمار',
+    sameSizeMoons: 'نفس الحجم',
+    reset: 'إعادة تعيين',
+
+    // Descriptions
+    sunDescription: 'الشمس هي نجم في مركز النظام الشمسي. إنها كرة شبه مثالية من البلازما الساخنة وهي بعيد جداً أهم مصدر طاقة للحياة على الأرض.',
+    mercuryDescription: 'عطارد هو أصغر كوكب في النظام الشمسي والأقرب إلى الشمس. لديه جسم صخري مثل الأرض لكنه أصغر بكثير.',
+    venusDescription: 'الزهرة هي الكوكب الثاني من الشمس وهي أقرب جار كوكبي للأرض. إنها واحدة من الكواكب الأرضية الداخلية الأربعة.',
+    earthDescription: 'الأرض هي الكوكب الثالث من الشمس والكائن الفلكي الوحيد المعروف الذي يحتوي على حياة. إنها العالم الوحيد في نظامنا الشمسي به مياه سائلة على السطح.',
+    marsDescription: 'المريخ هو الكوكب الرابع من الشمس وثاني أصغر كوكب في النظام الشمسي. يُعرف باسم الكوكب الأحمر.',
+    jupiterDescription: 'المشتري هو الكوكب الخامس من الشمس وهو أكبر كوكب في النظام الشمسي بشكل ملحوظ. كتلته تساوي كتلة جميع الكواكب الأخرى معاً.',
+    saturnDescription: 'زحل هو الكوكب السادس من الشمس. يشتهر بنظام حلقاته البارز، الذي يعتبر الأكثر شمولاً من بين جميع كواكب النظام الشمسي.',
+    uranusDescription: 'أورانوس هو الكوكب السابع من الشمس. إنه عملاق جليدي فريد يدور على جانبه، بزاوية محور دوران تبلغ 98 درجة.',
+    neptuneDescription: 'نبتون هو الكوكب الثامن من الشمس وهو أبعد كوكب في نظامنا الشمسي. إنه الكوكب الأكثر رياحاً المعروف، مع سرعات رياح تصل إلى 2100 كم/س.',
+
+    // Fun Facts
+    sunFunFact: 'الشمس تحتوي على 99.86% من كتلة النظام الشمسي!',
+    mercuryFunFact: 'لعطارد تجاعيد! عندما برد القلب الحديدي للكوكب وانكمش، طورت السطح "تجاعيد" أو ميزات انضغاطية.',
+    venusFunFact: 'تدور الزهرة في اتجاه معاكس لمعظم الكواكب، مما يعني أن الشمس تشرق من الغرب وتغرب في الشرق.',
+    earthFunFact: 'دوران الأرض يتباطأ تدريجياً. يحدث هذا التباطؤ بشكل غير محسوس تقريباً، بمعدل 17 مللي ثانية تقريباً لكل مائة سنة.',
+    marsFunFact: 'المريخ به أكبر بركان في النظام الشمسي - أولمبس مونس - والذي يبلغ ارتفاعه حوالي 21 كم.',
+    jupiterFunFact: 'المشتري كبير جداً لدرجة أن جميع الكواكب الأخرى يمكن أن تتسع بداخله!',
+    saturnFunFact: 'تحتوي حلقات زحل على عدد لا يحصى من جزيئات الجليد والصخور، تتراوح أحجامها من حبة رمل إلى ناطحة سحاب.',
+    uranusFunFact: 'يظهر أورانوس كرة بدون ميزات من السحب الزرقاء الفيروزية، مما يجعله أحد أملل الكواكب من الناحية البصرية.',
+    neptuneFunFact: 'رياح نبتون أقوى بثلاث مرات من رياح المشتري، مما يجعلها أقوى رياح في النظام الشمسي.',
+  }
+};
+
+export type Language = 'en' | 'ar';
+export type TranslationKey = keyof typeof translations.en;
+
+export const getPlanetTranslationKeys = (planetId: string): { description: TranslationKey; funFact: TranslationKey } | null => {
+  const keyMap: Record<string, { description: TranslationKey; funFact: TranslationKey }> = {
+    sun: { description: 'sunDescription', funFact: 'sunFunFact' },
+    mercury: { description: 'mercuryDescription', funFact: 'mercuryFunFact' },
+    venus: { description: 'venusDescription', funFact: 'venusFunFact' },
+    earth: { description: 'earthDescription', funFact: 'earthFunFact' },
+    mars: { description: 'marsDescription', funFact: 'marsFunFact' },
+    jupiter: { description: 'jupiterDescription', funFact: 'jupiterFunFact' },
+    saturn: { description: 'saturnDescription', funFact: 'saturnFunFact' },
+    uranus: { description: 'uranusDescription', funFact: 'uranusFunFact' },
+    neptune: { description: 'neptuneDescription', funFact: 'neptuneFunFact' },
+  };
+  return keyMap[planetId] || null;
+};

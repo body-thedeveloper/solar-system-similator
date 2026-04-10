@@ -3,11 +3,15 @@ import { setupSolarSystem } from './components/SolarSystem';
 import InfoPanel from './components/InfoPanel';
 import SpeedControl from './components/SpeedControl';
 import ComparisonPanel from './components/ComparisonPanel';
+import LanguageModal from './components/LanguageModal';
+import LanguageSwitcher from './components/LanguageSwitcher';
 import { PlanetData } from './data/planetData';
 import { Sun, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
+import { useLanguage } from './context/LanguageContext';
 
 function App() {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const { language, setLanguage, t } = useLanguage();
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetData | null>(null);
   const [simulationSpeed, setSimulationSpeed] = useState<number>(0.5);
   const [showComparison, setShowComparison] = useState<boolean>(false);
@@ -16,6 +20,10 @@ function App() {
     planetB: PlanetData | null;
   }>({ planetA: null, planetB: null });
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [showLanguageModal, setShowLanguageModal] = useState<boolean>(() => {
+    // Show modal only if no language has been selected yet
+    return !localStorage.getItem('language');
+  });
   const [paused, setPaused] = useState<boolean>(false);
   const [hideMoons, setHideMoons] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
@@ -82,7 +90,7 @@ function App() {
             setSelectedPlanet(planet as PlanetData);
           }
         },
-        { hideMoons, showLabels, planetScale }
+        { hideMoons, showLabels, planetScale, tFunc: t, currentLanguage: language }
       );
       setSolarApi(api);
 
@@ -99,7 +107,7 @@ function App() {
         api.cleanupScene();
       };
     }
-  }, [showComparison, hideMoons, showLabels, planetScale, paused, simulationSpeed]);
+  }, [showComparison, hideMoons, showLabels, planetScale, paused, simulationSpeed, t, language]);
   
   useEffect(() => {
     // Update simulation speed when slider changes
@@ -137,6 +145,11 @@ function App() {
     setPaused((prev) => !prev);
   };
 
+  const handleLanguageSelect = (lang: 'en' | 'ar') => {
+    setLanguage(lang);
+    setShowLanguageModal(false);
+  };
+
   const handleToggleComparison = () => {
     setShowComparison((prev) => {
       if (!prev) {
@@ -167,18 +180,29 @@ function App() {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
-      {/* Loading screen */}
-      {isLoading && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black text-white">
-          <Sun className="w-16 h-16 animate-spin text-yellow-500" />
-          <h1 className="mt-4 text-2xl font-bold">Loading Solar System...</h1>
+      {/* Language Selection Modal */}
+      <LanguageModal 
+        isOpen={showLanguageModal}
+        onLanguageSelect={handleLanguageSelect}
+      />
+
+      {/* Loading screen - only show after language is selected */}
+      {isLoading && !showLanguageModal && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-6">
+            <Sun className="w-20 h-20 animate-spin text-yellow-400" />
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-white mb-2">Loading Solar System...</h1>
+              <p className="text-gray-300">Initializing the universe...</p>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Three.js canvas container */}
       <div 
         ref={canvasRef} 
-        className="absolute inset-0 z-0" 
+        className="absolute inset-0 z-0 bg-black" 
       />
 
       {/* UI Controls */}
@@ -241,14 +265,16 @@ function App() {
       )}
 
       {/* Top navigation buttons */}
-      <div className="absolute top-5 right-5 z-10 flex space-x-3">
+      <div className={`absolute top-5 right-5 z-10 flex items-center gap-8 ${language === 'ar' ? 'space-x-reverse' : ''}`}>
+        <LanguageSwitcher />
+        <div className="w-4"></div>
         <button 
           className={`px-4 py-2 rounded-lg font-semibold text-sm ${
             showComparison ? 'bg-blue-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
           }`}
           onClick={handleToggleComparison}
         >
-          Compare Planets
+          {t('comparePlanets')}
         </button>
       </div>
     </div>
