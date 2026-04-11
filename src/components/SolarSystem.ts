@@ -136,6 +136,7 @@ export function setupSolarSystem(
   let hoveredOrbit: THREE.Line | null = null;
   let hoveredOrbitId: string | null = null;
   let orbitLabelSprite: THREE.Sprite | null = null;
+  let lastMouseN = new THREE.Vector2(0, 0);
 
   // Helper: add starfield background using texture
   function addStarfieldBackground() {
@@ -312,7 +313,7 @@ export function setupSolarSystem(
   });
 
   // --- ORBIT HOVER & LABELS ---
-  function showOrbitLabel(planetId: string) {
+  function showOrbitLabel(planetId: string, mouseN: THREE.Vector2) {
     if (orbitLabelSprite) {
       scene.remove(orbitLabelSprite);
       orbitLabelSprite = null;
@@ -328,12 +329,12 @@ export function setupSolarSystem(
     const ctx = canvas.getContext('2d')!;
     const scale = 4;
     const fontFamily = options?.currentLanguage === 'ar' ? 'Cairo' : 'Inter';
-    ctx.font = `bold ${18 * scale}px ${fontFamily}, Arial`;
-    const padding = 16 * scale;
+    ctx.font = `bold ${36 * scale}px ${fontFamily}, Arial`;
+    const padding = 20 * scale;
     const textWidth = Math.ceil(ctx.measureText(text).width);
-    const textHeight = Math.ceil(18 * scale * 1.4);
-    canvas.width = Math.max(textWidth + padding * 2, 180);
-    canvas.height = textHeight + padding * 1.5;
+    const textHeight = Math.ceil(36 * scale * 1.4);
+    canvas.width = Math.max(textWidth + padding * 2, 280);
+    canvas.height = textHeight + padding * 2.5;
 
     // rounded translucent background
     const r = 6 * scale;
@@ -367,11 +368,25 @@ export function setupSolarSystem(
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
     orbitLabelSprite = new THREE.Sprite(mat);
 
-    // size and position: place near orbit at positive X and modest height
-    const w = (planet.distanceFromSun * ORBIT_DISTANCE_SCALE) * 0.26;
-    const h = canvas.height / 40;
+    // size and position: scale based on orbit distance, positioned following mouse direction
+    const scaledDist = planet.distanceFromSun * ORBIT_DISTANCE_SCALE;
+    const w = scaledDist * 0.32;
+    const h = w * (canvas.height / canvas.width) * 0.75;
     orbitLabelSprite.scale.set(w, h, 1);
-    orbitLabelSprite.position.set((planet.distanceFromSun * ORBIT_DISTANCE_SCALE), 5.2, 0);
+    
+    // Position label along the raycaster direction from camera
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouseN, camera);
+    // Find intersection with orbit plane (y=0) and place label there, offset outward
+    const planeIntersection = new THREE.Vector3();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    raycaster.ray.intersectPlane(plane, planeIntersection);
+    
+    // Normalize to orbit radius and add offset for visibility
+    const dir = planeIntersection.normalize();
+    const offsetDist = scaledDist * 1.15; // offset 15% beyond orbit
+    orbitLabelSprite.position.copy(dir.multiplyScalar(offsetDist));
+    orbitLabelSprite.position.y = 8; // height above plane
     scene.add(orbitLabelSprite);
 
     // fade-in quickly
@@ -422,6 +437,9 @@ export function setupSolarSystem(
       }
     }
 
+    // Update last mouse position for label positioning
+    lastMouseN.copy(mouseN);
+    
     if (foundOrbit && minDist < 3) {
       if (hoveredOrbit !== foundOrbit.line) {
         // restore previous (set back to default black + low opacity)
@@ -434,7 +452,22 @@ export function setupSolarSystem(
         // highlight hovered orbit (bright and more opaque)
         (hoveredOrbit.material as THREE.LineBasicMaterial).color.set(0xffffff);
         (hoveredOrbit.material as THREE.LineBasicMaterial).opacity = 0.9;
-        showOrbitLabel(foundOrbit.planetId);
+        showOrbitLabel(foundOrbit.planetId, mouseN);
+      } else if (orbitLabelSprite && hoveredOrbitId === foundOrbit.planetId) {
+        // Update label position as mouse moves
+        const planet = planetData.find(p => p.id === hoveredOrbitId);
+        if (planet) {
+          const raycaster = new THREE.Raycaster();
+          raycaster.setFromCamera(mouseN, camera);
+          const planeIntersection = new THREE.Vector3();
+          const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+          raycaster.ray.intersectPlane(plane, planeIntersection);
+          const dir = planeIntersection.normalize();
+          const scaledDist = planet.distanceFromSun * ORBIT_DISTANCE_SCALE;
+          const offsetDist = scaledDist * 1.15;
+          orbitLabelSprite.position.copy(dir.multiplyScalar(offsetDist));
+          orbitLabelSprite.position.y = 8;
+        }
       }
     } else if (hoveredOrbit) {
       // restore to default black + low opacity
@@ -524,9 +557,12 @@ export function setupSolarSystem(
         dayLength: '—',
         yearLength: '—',
         avgTemp: '—',
-        funFact: `Click Learn More to search NASA about ${md.name}.`,
+        funFact: `Click Learn More to search NASA.`,
         moons: []
       };
+      // Mark this as a moon for InfoPanel
+      (moonPayload as any).isMoon = true;
+      (moonPayload as any).parentId = parent?.id;
       // focus on parent planet first for context
       if (parent) focusCameraOnPlanet(parent);
       onPlanetClick(moonPayload);

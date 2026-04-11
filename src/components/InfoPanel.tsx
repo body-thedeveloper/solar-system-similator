@@ -46,11 +46,32 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   const [loading, setLoading] = useState(false);
 
   const parentId = (planet as any).parentId;
-  const parentLabel = parentId ? ` • ${t('satelliteOf')} ${parentId}` : '';
+  const isMoon = (planet as any).isMoon || parentId;
+  
+  // For moons, translate the moon name based on current language
+  let displayName = planet.name;
+  let translatedDescription = planet.description;
+  let translatedFunFact = planet.funFact;
+  
+  if (isMoon) {
+    // Translate moon name
+    const moonNameKey = planet.name.toLowerCase().replace(/\s+/g, '');
+    const translatedMoonName = t(moonNameKey);
+    // Only use translation if we got back something different (actual translation found)
+    if (translatedMoonName && translatedMoonName !== moonNameKey) {
+      displayName = translatedMoonName;
+    }
+    
+    // Translate description and fun fact
+    translatedDescription = `${t('moonOf')} ${t(parentId) || parentId}.`;
+    translatedFunFact = `${t('clickLearnMore')}.`;
+  }
+  
+  const parentLabel = parentId ? ` • ${t('moonOf')} ${t(parentId) || parentId}` : '';
   
   const translationKeys = getPlanetTranslationKeys(planet.id);
-  const displayDescription = translationKeys ? t(translationKeys.description) : planet.description;
-  const displayFunFact = translationKeys ? t(translationKeys.funFact) : planet.funFact;
+  const displayDescription = translationKeys ? t(translationKeys.description) : (isMoon ? translatedDescription : planet.description);
+  const displayFunFact = translationKeys ? t(translationKeys.funFact) : (isMoon ? translatedFunFact : planet.funFact);
   
   // Function to translate time values
   const translateTimeValue = (value: string): string => {
@@ -76,7 +97,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         </button>
         
         <div className="p-5">
-          <h2 className="text-2xl font-bold mb-1">{t(planet.id) || planet.name}{parentLabel}</h2>
+          <h2 className="text-2xl font-bold mb-1">{isMoon ? displayName : (t(planet.id) || planet.name)}{parentLabel}</h2>
           <div className="w-full h-0.5 bg-white/20 mb-4"></div>
           
           {showComparison && (
@@ -107,7 +128,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <h3 className="text-gray-400">{t('diameter')}</h3>
-                <p>{planet.diameter.toLocaleString()} km</p>
+                <p>{planet.diameter.toLocaleString()} {t('km')}</p>
               </div>
               <div>
                 <h3 className="text-gray-400">{t('mass')}</h3>
@@ -115,7 +136,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               <div>
                 <h3 className="text-gray-400">{t('dayLength')}</h3>
-                <p>{translateTimeValue(planet.dayLength)}</p>
+                <p>{translateTimeValue(planet.dayLength).replace(/\(equator\)/g, ` ${t('equator')}`)}</p>
               </div>
               <div>
                 <h3 className="text-gray-400">{t('yearLength')}</h3>
@@ -123,7 +144,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               <div>
                 <h3 className="text-gray-400">{t('avgTemp')}</h3>
-                <p>{planet.avgTemp}</p>
+                <p>{planet.avgTemp.replace(/\(surface\)/g, ` ${t('surface')}`)}</p>
               </div>
               <div>
                 <h3 className="text-gray-400">{t('distanceFromSun')}</h3>

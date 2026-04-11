@@ -265,9 +265,8 @@ function App() {
       )}
 
       {/* Top navigation buttons */}
-      <div className={`absolute top-5 right-5 z-10 flex items-center gap-8 ${language === 'ar' ? 'space-x-reverse' : ''}`}>
+      <div className={`absolute top-5 right-5 z-10 flex items-center gap-4 ${language === 'ar' ? 'space-x-reverse' : ''}`}>
         <LanguageSwitcher />
-        <div className="w-4"></div>
         <button 
           className={`px-4 py-2 rounded-lg font-semibold text-sm ${
             showComparison ? 'bg-blue-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
