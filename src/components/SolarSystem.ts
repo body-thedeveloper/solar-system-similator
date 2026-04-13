@@ -132,11 +132,35 @@ export function setupSolarSystem(
   const moonGroups: Record<string, THREE.Group> = {};
   const moonMeshes: Record<string, THREE.Mesh> = {};
   const labelSprites: Record<string, THREE.Sprite> = {};
+  const labelData: Record<string, { sprite: THREE.Sprite, planetGroup?: THREE.Group }> = {};
   // Orbit hover state
   let hoveredOrbit: THREE.Line | null = null;
   let hoveredOrbitId: string | null = null;
-  let orbitLabelSprite: THREE.Sprite | null = null;
-  let lastMouseN = new THREE.Vector2(0, 0);
+
+  // Helper to create high-quality label texture
+  function createLabelTexture(text: string, bold: boolean = false): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    const scale = 8; // Higher scale for better quality
+    const fontFamily = options?.currentLanguage === 'ar' ? 'Cairo' : 'Inter';
+    const fontSize = bold ? 36 : 28;
+    ctx.font = `${bold ? 'bold' : ''} ${fontSize * scale}px ${fontFamily}, Arial`;
+    const textWidth = Math.ceil(ctx.measureText(text).width);
+    const textHeight = Math.ceil(fontSize * scale * 1.2);
+    canvas.width = textWidth;
+    canvas.height = textHeight;
+
+    // text only
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.NearestFilter; // Crisp rendering
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+  }
 
   // Helper: add starfield background using texture
   function addStarfieldBackground() {
@@ -159,11 +183,26 @@ export function setupSolarSystem(
   // Call starfield instead of procedural stars
   addStarfieldBackground();
 
-  // Sun mesh
+  // Sun mesh with label
   const sun = new THREE.Mesh(new THREE.SphereGeometry(8.5, 32, 32), new THREE.MeshBasicMaterial({ map: sunTexture }));
   sun.name = 'sun';
   sun.userData = { isSun: true };
   scene.add(sun);
+
+  // Create Sun label
+  {
+    const sunName = options?.tFunc ? options.tFunc('sun') : 'Sun';
+    const tex = createLabelTexture(sunName, true);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.set(0, 15, 0); // Above sun
+    const scaledDist = 50;
+    const w = scaledDist * 0.15;
+    sprite.scale.set(w, w, 1);
+    scene.add(sprite);
+    labelSprites['sun'] = sprite;
+    labelData['sun'] = { sprite };
+  }
 
   // Create planets and moons
   planetData.forEach((planet) => {
@@ -308,11 +347,29 @@ export function setupSolarSystem(
 
     // Store orbit speed & angle on group
     planetGroup.userData = { orbitSpeed: planet.orbitSpeed, angle: initialAngle, planetId: planet.id };
+    
+    // Add planet label above the planet mesh
+    {
+      const planetName = options?.tFunc ? options.tFunc(planet.id) : planet.name;
+      const tex = createLabelTexture(planetName, true);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+      const labelSprite = new THREE.Sprite(mat);
+      labelSprite.position.set(0, planet.radius + 3, 0); // Above planet
+      const w = planet.radius * 3;
+      labelSprite.scale.set(w, w, 1);
+      labelSprite.visible = options?.showLabels ?? false;
+      planetGroup.add(labelSprite);
+      labelSprites[planet.id] = labelSprite;
+      labelData[planet.id] = { sprite: labelSprite, planetGroup };
+    }
+    
     scene.add(planetGroup);
     planets.push(planetGroup);
   });
 
-  // --- ORBIT HOVER & LABELS ---
+  // Hover label for orbit circumference
+  let orbitLabelSprite: THREE.Sprite | null = null;
+
   function showOrbitLabel(planetId: string, mouseN: THREE.Vector2) {
     if (orbitLabelSprite) {
       scene.remove(orbitLabelSprite);
@@ -320,73 +377,32 @@ export function setupSolarSystem(
     }
     const planet = planetData.find(p => p.id === planetId);
     if (!planet) return;
-    const radiusKm = (planet.distanceFromSun * ORBIT_DISTANCE_SCALE) * 0.1; // million km units
-    const radiusLabel = options?.tFunc ? options.tFunc('radius') : 'Radius';
+    const scaledDist = planet.distanceFromSun * ORBIT_DISTANCE_SCALE;
+    const circumferenceMilKm = (scaledDist * Math.PI * 2) * 0.1; // million km units
+    const circumLabel = options?.tFunc ? options.tFunc('circumference') : 'Circumference';
     const millionKmLabel = options?.tFunc ? options.tFunc('millionKm') : 'million km';
-    const text = `${radiusLabel}: ${radiusKm.toFixed(1)} ${millionKmLabel}`;
+    const text = `${circumLabel}: ${circumferenceMilKm.toFixed(1)} ${millionKmLabel}`;
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    const scale = 4;
-    const fontFamily = options?.currentLanguage === 'ar' ? 'Cairo' : 'Inter';
-    ctx.font = `bold ${36 * scale}px ${fontFamily}, Arial`;
-    const padding = 20 * scale;
-    const textWidth = Math.ceil(ctx.measureText(text).width);
-    const textHeight = Math.ceil(36 * scale * 1.4);
-    canvas.width = Math.max(textWidth + padding * 2, 280);
-    canvas.height = textHeight + padding * 2.5;
-
-    // rounded translucent background
-    const r = 6 * scale;
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.beginPath();
-    ctx.moveTo(r, 0);
-    ctx.lineTo(canvas.width - r, 0);
-    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, r);
-    ctx.lineTo(canvas.width, canvas.height - r);
-    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - r, canvas.height);
-    ctx.lineTo(r, canvas.height);
-    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - r);
-    ctx.lineTo(0, r);
-    ctx.quadraticCurveTo(0, 0, r, 0);
-    ctx.closePath();
-    ctx.fill();
-
-    // stroke + fill text for clarity
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.lineWidth = 1 * scale;
-    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-    // Use white text when hovering so the label is clearly visible
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
+    const tex = createLabelTexture(text, false);
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
     orbitLabelSprite = new THREE.Sprite(mat);
 
-    // size and position: scale based on orbit distance, positioned following mouse direction
-    const scaledDist = planet.distanceFromSun * ORBIT_DISTANCE_SCALE;
-    const w = scaledDist * 0.32;
-    const h = w * (canvas.height / canvas.width) * 0.75;
+    // size and position
+    const w = scaledDist * 0.25;
+    const h = w;
     orbitLabelSprite.scale.set(w, h, 1);
     
     // Position label along the raycaster direction from camera
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouseN, camera);
-    // Find intersection with orbit plane (y=0) and place label there, offset outward
     const planeIntersection = new THREE.Vector3();
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     raycaster.ray.intersectPlane(plane, planeIntersection);
     
-    // Normalize to orbit radius and add offset for visibility
     const dir = planeIntersection.normalize();
-    const offsetDist = scaledDist * 1.15; // offset 15% beyond orbit
+    const offsetDist = scaledDist * 1.15;
     orbitLabelSprite.position.copy(dir.multiplyScalar(offsetDist));
-    orbitLabelSprite.position.y = 8; // height above plane
+    orbitLabelSprite.position.y = 8;
     scene.add(orbitLabelSprite);
 
     // fade-in quickly
@@ -401,7 +417,6 @@ export function setupSolarSystem(
 
   function hideOrbitLabel() {
     if (!orbitLabelSprite) return;
-    // fade-out then remove
     let op = (orbitLabelSprite.material as THREE.SpriteMaterial).opacity || 1;
     const fadeOut = () => {
       op = Math.max(0, op - 0.12);
@@ -436,9 +451,6 @@ export function setupSolarSystem(
         }
       }
     }
-
-    // Update last mouse position for label positioning
-    lastMouseN.copy(mouseN);
     
     if (foundOrbit && minDist < 3) {
       if (hoveredOrbit !== foundOrbit.line) {
@@ -640,8 +652,10 @@ export function setupSolarSystem(
   }
   setMoonsVisible(!(options?.hideMoons ?? false));
 
-  function setLabelsVisible(_: boolean) {
-    // labels not implemented in this trimmed version
+  function setLabelsVisible(visible: boolean) {
+    Object.values(labelSprites).forEach(sprite => {
+      sprite.visible = visible;
+    });
   }
 
   function setPlanetScale(scale: number) {
