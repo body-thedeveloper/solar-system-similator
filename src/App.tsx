@@ -5,6 +5,7 @@ import SpeedControl from './components/SpeedControl';
 import ComparisonPanel from './components/ComparisonPanel';
 import LanguageModal from './components/LanguageModal';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import TourGuide from './components/TourGuide';
 import { PlanetData } from './data/planetData';
 import { Sun, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
 import { useLanguage } from './context/LanguageContext';
@@ -30,6 +31,7 @@ function App() {
   const [planetScale, setPlanetScale] = useState(1);
   const [solarApi, setSolarApi] = useState<any>(null);
   const [galaxyVisible, setGalaxyVisible] = useState(false);
+  const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -93,6 +95,9 @@ function App() {
         { hideMoons, showLabels, planetScale, tFunc: t, currentLanguage: language }
       );
       setSolarApi(api);
+
+      // ensure tour is closed when scene is (re)initialized
+      setShowTour(false);
 
       api.updateSimulationSpeed(paused ? 0 : simulationSpeed);
 
@@ -247,6 +252,7 @@ function App() {
         <InfoPanel 
           planet={selectedPlanet} 
           onClose={() => setSelectedPlanet(null)}
+          solarApi={solarApi}
           showComparison={false}
           comparisonPlanets={comparisonPlanets}
           onChooseAsA={handleChooseAsA}
@@ -267,6 +273,12 @@ function App() {
       {/* Top navigation buttons */}
       <div className={`absolute top-5 right-5 z-10 flex items-center gap-4 ${language === 'ar' ? 'space-x-reverse' : ''}`}>
         <LanguageSwitcher />
+        <button
+          className={`px-3 py-2 rounded-lg text-sm bg-white/10 text-white hover:bg-white/20`}
+          onClick={() => { setShowTour((s) => { const next = !s; if (next) { setSelectedPlanet(null); } return next; }); }}
+        >
+          {showTour ? 'Stop Tour' : 'Start Tour'}
+        </button>
         <button 
           className={`px-4 py-2 rounded-lg font-semibold text-sm ${
             showComparison ? 'bg-blue-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
@@ -276,6 +288,8 @@ function App() {
           {t('comparePlanets')}
         </button>
       </div>
+
+      <TourGuide solarApi={solarApi} isOpen={showTour} onClose={() => setShowTour(false)} />
     </div>
   );
 }

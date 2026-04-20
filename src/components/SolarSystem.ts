@@ -52,6 +52,9 @@ export function setupSolarSystem(
 
   // Configuration constants
   const ORBIT_DISTANCE_SCALE = 1.8;    // spread planetary orbits
+  const LABEL_SCALE_MULTIPLIER = 0.32; // further reduce planet label size
+  const PLANET_LABEL_FONT_PX_BOLD = 20; // bold planet label font (px) - smaller
+  const ORBIT_LABEL_FONT_PX = 14; // orbit labels smaller (reduced only)
   // Keep authoritative km->visual scale small so moons stay small visually (matches original look)
   const MOON_SIZE_SCALE = 1.0;
   const AUTH_MOON_VISUAL_SCALE = 0.35 // scale applied when converting km ratios -> visual units
@@ -136,29 +139,76 @@ export function setupSolarSystem(
   // Orbit hover state
   let hoveredOrbit: THREE.Line | null = null;
   let hoveredOrbitId: string | null = null;
+  // Camera follow (surface/standing) state
+  let followPlanetId: string | null = null;
+  let followPrevPos = new THREE.Vector3();
+  let followEnabled = false;
+  let followLockToSurface = false;
+  let followHeight = 2;
+  const savedControls: { minDistance?: number; maxDistance?: number; enablePan?: boolean } = {};
 
-  // Helper to create high-quality label texture
-  function createLabelTexture(text: string, bold: boolean = false): THREE.CanvasTexture {
+  // Helper to create high-quality label texture with optional letter-spacing.
+  // Uses explicit pixel font sizes and canvas text metrics to keep height aligned with glyph widths.
+  function createLabelTexture(text: string, bold: boolean = false, letterSpacing: number = 0, fontPx?: number): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
-    const scale = 8; // Higher scale for better quality
+    const scale = 4; // canvas upscaling for quality
     const fontFamily = options?.currentLanguage === 'ar' ? 'Cairo' : 'Inter';
-    const fontSize = bold ? 36 : 28;
-    ctx.font = `${bold ? 'bold' : ''} ${fontSize * scale}px ${fontFamily}, Arial`;
-    const textWidth = Math.ceil(ctx.measureText(text).width);
-    const textHeight = Math.ceil(fontSize * scale * 1.2);
-    canvas.width = textWidth;
-    canvas.height = textHeight;
+    const defaultFontSize = bold ? 30 : 26;
+    const fontSize = Math.max(8, Math.round(fontPx ?? defaultFontSize));
 
-    // text only
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    // Prepare font on measuring context
+    ctx.font = `${bold ? 'bold ' : ''}${fontSize * scale}px ${fontFamily}, Arial`;
+
+    // Use native shaping for Arabic or when no letter spacing requested
+    const useNativeShaping = options?.currentLanguage === 'ar' || letterSpacing === 0;
+
+    if (useNativeShaping) {
+      const metrics = ctx.measureText(text);
+      const textWidth = Math.ceil(metrics.width);
+      const ascent = metrics.actualBoundingBoxAscent || fontSize * scale * 0.72;
+      const descent = metrics.actualBoundingBoxDescent || fontSize * scale * 0.28;
+      const textHeight = Math.ceil(ascent + descent);
+      // small padding to avoid clipping
+      canvas.width = Math.max(1, textWidth + 8);
+      canvas.height = Math.max(1, textHeight + 8);
+      // Reset font after resizing
+      ctx.font = `${bold ? 'bold ' : ''}${fontSize * scale}px ${fontFamily}, Arial`;
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      // draw at baseline = ascent + padding/2
+      const y = Math.round(ascent) + 2;
+      ctx.fillText(text, canvas.width / 2, y);
+    } else {
+      // per-character layout with spacing
+      let totalWidth = 0;
+      for (let i = 0; i < text.length; i++) {
+        totalWidth += ctx.measureText(text[i]).width + letterSpacing * scale;
+      }
+      totalWidth -= letterSpacing * scale; // remove trailing spacing
+      const metrics = ctx.measureText(text);
+      const ascent = metrics.actualBoundingBoxAscent || fontSize * scale * 0.72;
+      const descent = metrics.actualBoundingBoxDescent || fontSize * scale * 0.28;
+      const textHeight = Math.ceil(ascent + descent);
+      canvas.width = Math.max(1, Math.ceil(totalWidth) + 8);
+      canvas.height = Math.max(1, textHeight + 8);
+      ctx.font = `${bold ? 'bold ' : ''}${fontSize * scale}px ${fontFamily}, Arial`;
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      let x = Math.round((canvas.width - totalWidth) / 2);
+      const y = Math.round(ascent) + 2;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        ctx.fillText(ch, x, y);
+        x += ctx.measureText(ch).width + letterSpacing * scale;
+      }
+    }
 
     const tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.NearestFilter; // Crisp rendering
-    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
     return tex;
   }
 
@@ -192,13 +242,15 @@ export function setupSolarSystem(
   // Create Sun label
   {
     const sunName = options?.tFunc ? options.tFunc('sun') : 'Sun';
-    const tex = createLabelTexture(sunName, true);
+    const tex = createLabelTexture(sunName, true, 0, 48); // explicit px size for sun
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
     const sprite = new THREE.Sprite(mat);
     sprite.position.set(0, 15, 0); // Above sun
     const scaledDist = 50;
-    const w = scaledDist * 0.15;
-    sprite.scale.set(w, w, 1);
+    const desiredHeight = scaledDist * 0.15 * LABEL_SCALE_MULTIPLIER;
+    const img = (tex.image as HTMLCanvasElement | undefined);
+    const aspect = img && img.width && img.height ? img.width / img.height : 1;
+    sprite.scale.set(aspect * desiredHeight, desiredHeight, 1);
     scene.add(sprite);
     labelSprites['sun'] = sprite;
     labelData['sun'] = { sprite };
@@ -260,12 +312,18 @@ export function setupSolarSystem(
       saturnRingTexture.wrapT = THREE.RepeatWrapping;
       // repeat U (around circumference) more than V (radial) — tweak the first value to change banding density
       saturnRingTexture.repeat.set(6, 1);
+      saturnRingTexture.minFilter = THREE.LinearMipMapLinearFilter;
+      saturnRingTexture.magFilter = THREE.LinearFilter;
+      saturnRingTexture.generateMipmaps = true;
 
       const ringMaterial = new THREE.MeshBasicMaterial({
         map: saturnRingTexture,
         transparent: true,
         side: THREE.DoubleSide,
-        alphaTest: 0.05
+        alphaTest: 0.01,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1
       });
       ringMaterial.emissiveIntensity = 0.3;
 
@@ -274,9 +332,9 @@ export function setupSolarSystem(
       ringMesh.receiveShadow = true;
       // Make the ring horizontal (no axial tilt)
       ringMesh.rotation.x = 0;
-      // Slight offset to avoid z-fighting with the planet
-      ringMesh.position.y = 0.02;
-      ringMesh.renderOrder = 1;
+      // Slight offset to avoid z-fighting with the planet (increase slightly to avoid thin artifact)
+      ringMesh.position.y = 0.04;
+      ringMesh.renderOrder = 2;
       planetGroup.add(ringMesh);
     }
 
@@ -351,12 +409,15 @@ export function setupSolarSystem(
     // Add planet label above the planet mesh
     {
       const planetName = options?.tFunc ? options.tFunc(planet.id) : planet.name;
-      const tex = createLabelTexture(planetName, true);
+      const tex = createLabelTexture(planetName, true, 0, PLANET_LABEL_FONT_PX_BOLD); // bold-only planet labels
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
       const labelSprite = new THREE.Sprite(mat);
       labelSprite.position.set(0, planet.radius + 3, 0); // Above planet
-      const w = planet.radius * 3;
-      labelSprite.scale.set(w, w, 1);
+      const desiredHeight = planet.radius * 3 * LABEL_SCALE_MULTIPLIER;
+      const img = (tex.image as HTMLCanvasElement | undefined);
+      const aspect = img && img.width && img.height ? img.width / img.height : 1;
+      // make labels slightly wider than tall to avoid cramped glyphs
+      labelSprite.scale.set(aspect * desiredHeight * 1.05, desiredHeight, 1);
       labelSprite.visible = options?.showLabels ?? false;
       planetGroup.add(labelSprite);
       labelSprites[planet.id] = labelSprite;
@@ -379,18 +440,19 @@ export function setupSolarSystem(
     if (!planet) return;
     const scaledDist = planet.distanceFromSun * ORBIT_DISTANCE_SCALE;
     const circumferenceMilKm = (scaledDist * Math.PI * 2) * 0.1; // million km units
-    const circumLabel = options?.tFunc ? options.tFunc('circumference') : 'Circumference';
-    const millionKmLabel = options?.tFunc ? options.tFunc('millionKm') : 'million km';
+    const circumLabel = options?.tFunc ? options.tFunc('circumference') : (options?.currentLanguage === 'ar' ? 'المحيط' : 'Circumference');
+    const millionKmLabel = options?.tFunc ? options.tFunc('millionKm') : (options?.currentLanguage === 'ar' ? 'مليون كم' : 'million km');
     const text = `${circumLabel}: ${circumferenceMilKm.toFixed(1)} ${millionKmLabel}`;
 
-    const tex = createLabelTexture(text, false);
+    const tex = createLabelTexture(text, false, 1.2, ORBIT_LABEL_FONT_PX);
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
     orbitLabelSprite = new THREE.Sprite(mat);
 
-    // size and position
-    const w = scaledDist * 0.25;
-    const h = w;
-    orbitLabelSprite.scale.set(w, h, 1);
+    // size and position (preserve aspect ratio)
+    const desiredHeight = scaledDist * 0.25 * LABEL_SCALE_MULTIPLIER;
+    const img = (tex.image as HTMLCanvasElement | undefined);
+    const aspect = img && img.width && img.height ? img.width / img.height : 1;
+    orbitLabelSprite.scale.set(aspect * desiredHeight, desiredHeight, 1);
     
     // Position label along the raycaster direction from camera
     const raycaster = new THREE.Raycaster();
@@ -608,6 +670,41 @@ export function setupSolarSystem(
     simulationSpeed = speed;
   }
 
+  // Attach camera to a planet so it moves with the planet (optionally lock near surface)
+  function followPlanet(planetId: string, height: number = 2, lockToSurface: boolean = false) {
+    const pm = planetMeshes[planetId];
+    if (!pm) return;
+    followPlanetId = planetId;
+    followEnabled = true;
+    followLockToSurface = !!lockToSurface;
+    followHeight = height;
+    pm.getWorldPosition(followPrevPos);
+
+    // place camera above the planet surface
+    const desiredPos = followPrevPos.clone().add(new THREE.Vector3(0, height, 0));
+    camera.position.copy(desiredPos);
+    controls.target.copy(followPrevPos);
+    // save controls state and restrict panning if requested
+    savedControls.minDistance = controls.minDistance;
+    savedControls.maxDistance = controls.maxDistance;
+    savedControls.enablePan = (controls as any).enablePan;
+    if (followLockToSurface) {
+      controls.minDistance = 0.1;
+      controls.maxDistance = Math.max(5, height * 4);
+      (controls as any).enablePan = false;
+    }
+  }
+
+  function stopFollowPlanet() {
+    followPlanetId = null;
+    followEnabled = false;
+    followLockToSurface = false;
+    // restore controls
+    if (savedControls.minDistance !== undefined) controls.minDistance = savedControls.minDistance;
+    if (savedControls.maxDistance !== undefined) controls.maxDistance = savedControls.maxDistance;
+    if (savedControls.enablePan !== undefined) (controls as any).enablePan = savedControls.enablePan;
+  }
+
   // Animation loop
   function animate() {
     requestAnimationFrame(animate);
@@ -632,6 +729,56 @@ export function setupSolarSystem(
         });
       }
     });
+
+    // Update planet label positions: place above the planet and keep them small (once per frame)
+    try {
+      Object.keys(labelData).forEach((id) => {
+        const ld = labelData[id];
+        if (!ld) return;
+        const sprite = ld.sprite;
+        const pg = ld.planetGroup;
+        // If we don't have a planetGroup (sun label), skip the per-planet positioning
+        if (!pg) return;
+
+        // Get planet world position and radius
+        const worldPos = new THREE.Vector3();
+        pg.getWorldPosition(worldPos);
+        const pid = pg.userData?.planetId as string | undefined;
+        const pm = pid ? planetMeshes[pid] : undefined;
+        const radius = pm ? ((pm.geometry as any).parameters?.radius || 0) : 0;
+
+        // place label directly above the planet (local +Y)
+        const offset = Math.max(1, radius + 2);
+        const labelWorldPos = worldPos.clone().add(new THREE.Vector3(0, offset, 0));
+
+        // convert to planet-local coordinates and apply smoothly
+        const local = pg.worldToLocal(labelWorldPos.clone());
+        sprite.position.lerp(local, 0.6);
+
+        // keep label small (height relative to planet radius)
+        const desiredHeight = Math.max(6, radius * 0.45 * LABEL_SCALE_MULTIPLIER);
+        const texImg = (sprite.material as THREE.SpriteMaterial).map?.image as HTMLCanvasElement | undefined;
+        const aspect = texImg && texImg.width && texImg.height ? texImg.width / texImg.height : 1;
+        sprite.scale.set(aspect * desiredHeight, desiredHeight, 1);
+      });
+    } catch (e) {
+      // defensive: skip label updates on any error
+    }
+
+    // If following a planet, translate camera/controls by planet movement delta so camera moves with planet
+    if (followEnabled && followPlanetId) {
+      const pm = planetMeshes[followPlanetId];
+      if (pm) {
+        const curr = new THREE.Vector3();
+        pm.getWorldPosition(curr);
+        const delta = curr.clone().sub(followPrevPos);
+        if (delta.lengthSq() > 0) {
+          camera.position.add(delta);
+          controls.target.add(delta);
+        }
+        followPrevPos.copy(curr);
+      }
+    }
 
     controls.update();
     renderer.render(scene, camera);
@@ -697,7 +844,7 @@ export function setupSolarSystem(
   }
 
   // Expose API
-  (window as any).solarSystem = { updateSimulationSpeed };
+  (window as any).solarSystem = { updateSimulationSpeed, followPlanet, stopFollowPlanet, getFollowingPlanetId: () => followPlanetId };
   return {
     selectPlanet: (planetId: string) => {
       const p = planetData.find(p => p.id === planetId);
@@ -711,6 +858,9 @@ export function setupSolarSystem(
     zoomIn,
     zoomOut,
     getCameraDistance,
+    followPlanet,
+    stopFollowPlanet,
+    getFollowingPlanetId: () => followPlanetId,
     isGalaxyVisible: () => false
   };
 }

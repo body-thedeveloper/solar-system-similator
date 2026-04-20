@@ -14,6 +14,7 @@ interface InfoPanelProps {
   };
   onChooseAsA?: (planet: PlanetData) => void;
   onChooseAsB?: (planet: PlanetData) => void;
+  solarApi?: any;
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -22,7 +23,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   showComparison,
   comparisonPlanets,
   onChooseAsA,
-  onChooseAsB
+  onChooseAsB,
+  solarApi
 }) => {
   // NASA links for planets and sun
   const nasaLinks: Record<string, string> = {
@@ -44,6 +46,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(false);
+  const isStanding = !!solarApi && ((solarApi.getFollowingPlanetId && solarApi.getFollowingPlanetId() === planet.id));
 
   const parentId = (planet as any).parentId;
   const isMoon = (planet as any).isMoon || parentId;
@@ -97,7 +100,24 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         </button>
         
         <div className="p-5">
-          <h2 className="text-2xl font-bold mb-1">{isMoon ? displayName : (t(planet.id) || planet.name)}{parentLabel}</h2>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-2xl font-bold">{isMoon ? displayName : (t(planet.id) || planet.name)}{parentLabel}</h2>
+            {!isMoon && planet.id !== 'sun' && solarApi && (
+              <button
+                onClick={() => {
+                  if (solarApi.getFollowingPlanetId && solarApi.getFollowingPlanetId() === planet.id) {
+                    solarApi.stopFollowPlanet?.();
+                  } else {
+                    const height = Math.max(1, planet.radius + 0.6);
+                    solarApi.followPlanet?.(planet.id, height, true);
+                  }
+                }}
+                className="ml-2 px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-sm"
+              >
+                {solarApi.getFollowingPlanetId && solarApi.getFollowingPlanetId() === planet.id ? t('stopStanding') || 'Stop Standing' : t('stand') || 'Stand'}
+              </button>
+            )}
+          </div>
           <div className="w-full h-0.5 bg-white/20 mb-4"></div>
           
           {showComparison && (
@@ -132,7 +152,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               <div>
                 <h3 className="text-gray-400">{t('mass')}</h3>
-                <p>{planet.mass}</p>
+                <p>{language === 'ar' ? planet.mass.replace(/\bkg\b/gi, 'كغ') : planet.mass}</p>
               </div>
               <div>
                 <h3 className="text-gray-400">{t('dayLength')}</h3>
@@ -158,7 +178,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <div className="flex flex-wrap gap-1">
                   {planet.moons.slice(0, 5).map((moon, index) => (
                     <span key={index} className="bg-white/10 px-2 py-1 rounded-full text-xs">
-                      {moon.name}
+                      {language === 'ar' ? (t(moon.name.toLowerCase().replace(/\s+/g, '')) || moon.name) : moon.name}
                     </span>
                   ))}
                   {planet.moons.length > 5 && (
