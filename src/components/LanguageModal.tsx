@@ -24,8 +24,8 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-[9999]">
-      <div className="bg-gradient-to-b from-slate-900 to-black border-2 border-cyan-500/50 rounded-3xl p-10 max-w-md w-full mx-4 shadow-2xl animate-fadeIn" style={{ boxShadow: '0 0 60px 0 rgba(34, 211, 238, 0.3)' }}>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999]">
+      <div className="liquid-glass liquid-glass-glow rounded-3xl p-10 max-w-md w-full mx-4 animate-fadeIn">
         <div className="flex justify-center mb-8">
           <div className="p-4 bg-gradient-to-br from-cyan-500/30 to-blue-500/20 rounded-full border border-cyan-400/50">
             <Globe size={40} className="text-cyan-400" />
@@ -42,10 +42,10 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
         <div className="flex flex-col gap-4 mb-8">
           <button
             onClick={() => handleLanguageClick('en')}
-            className={`w-full transition-all duration-200 transform active:scale-110 shadow-xl text-lg border rounded-xl font-bold py-4 px-6 ${
+            className={`w-full transition-all duration-200 transform active:scale-110 text-lg rounded-xl font-bold py-4 px-6 liquid-glass-button shiny-border-hover ${
               selectedLang === 'en' 
-                ? 'scale-110 bg-gradient-to-r from-blue-600 to-blue-700 border-blue-300/50 text-white' 
-                : 'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-400/50 text-white hover:scale-105'
+                ? 'scale-110 !bg-gradient-to-r from-blue-600 to-blue-700 text-white' 
+                : 'text-white hover:scale-105'
             }`}
           >
             <span className="text-2xl mr-3">🇬🇧</span> {t('english')}
@@ -53,10 +53,10 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
           
           <button
             onClick={() => handleLanguageClick('ar')}
-            className={`w-full transition-all duration-200 transform active:scale-110 shadow-xl text-lg border rounded-xl font-bold py-4 px-6 ${
+            className={`w-full transition-all duration-200 transform active:scale-110 text-lg rounded-xl font-bold py-4 px-6 liquid-glass-button shiny-border-hover ${
               selectedLang === 'ar' 
-                ? 'scale-110 bg-gradient-to-r from-green-600 to-green-700 border-green-300/50 text-white' 
-                : 'bg-gradient-to-r from-green-600 to-green-700 border-green-400/50 text-white hover:scale-105'
+                ? 'scale-110 !bg-gradient-to-r from-green-600 to-green-700 text-white' 
+                : 'text-white hover:scale-105'
             }`}
           >
             <span className="text-2xl mr-3">🇸🇦</span> {t('arabic')}
@@ -66,10 +66,10 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
         <button
           onClick={handleOK}
           disabled={!selectedLang}
-          className={`w-full py-3 px-6 font-bold rounded-lg transition-all duration-200 border text-base ${
+          className={`w-full py-3 px-6 font-bold rounded-xl transition-all duration-200 text-base liquid-glass-button shiny-border-hover ${
             selectedLang 
-              ? 'bg-gradient-to-r from-cyan-500 to-blue-500 border-cyan-300/50 text-white hover:shadow-lg hover:shadow-cyan-500/50 cursor-pointer' 
-              : 'bg-gray-700 border-gray-500/50 text-gray-400 cursor-not-allowed opacity-60'
+              ? 'text-white cursor-pointer' 
+              : 'opacity-60 cursor-not-allowed'
           }`}
         >
           {t('ok')}

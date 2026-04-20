@@ -291,6 +291,8 @@ export function setupSolarSystem(
     const initialAngle = Math.random() * Math.PI * 2;
     planetGroup.position.x = Math.cos(initialAngle) * scaledDistance;
     planetGroup.position.z = Math.sin(initialAngle) * scaledDistance;
+    // Store initial angle for reset functionality
+    planetGroup.userData.initialAngle = initialAngle;
 
     // Saturn rings
     if (planet.id === 'saturn') {
@@ -391,7 +393,8 @@ export function setupSolarSystem(
           orbitRadius: moonDistance,
           orbitSpeed: 0.02 + (Math.random() * 0.02),
           angle: moonAngle,
-          isMoon: true
+          isMoon: true,
+          initialAngle: moonAngle // Store initial angle for reset functionality
         };
 
         const moonKey = `${planet.id}:${moonMesh.userData.name}`;
@@ -705,6 +708,43 @@ export function setupSolarSystem(
     if (savedControls.enablePan !== undefined) (controls as any).enablePan = savedControls.enablePan;
   }
 
+  function resetCamera() {
+    stopFollowPlanet();
+    // Reset planets to their initial positions
+    planets.forEach((pg) => {
+      const initialAngle = pg.userData.initialAngle || 0;
+      pg.userData.angle = initialAngle;
+      const dist = pg.position.length() || pg.userData.orbitRadius;
+      pg.position.x = Math.cos(initialAngle) * dist;
+      pg.position.z = Math.sin(initialAngle) * dist;
+    });
+    // Reset moons to their initial positions
+    Object.values(moonGroups).forEach((mg) => {
+      mg.children.forEach((m: any) => {
+        const moonAngle = m.userData.initialAngle || Math.random() * Math.PI * 2;
+        m.userData.angle = moonAngle;
+        m.position.x = Math.cos(moonAngle) * m.userData.orbitRadius;
+        m.position.z = Math.sin(moonAngle) * m.userData.orbitRadius;
+      });
+    });
+    // Animate camera back to initial position
+    const startPos = camera.position.clone();
+    const startTarget = controls.target.clone();
+    // Reset to initial website position - matches when user first enters
+    const targetPos = new THREE.Vector3(0, 50, 100);
+    const targetLook = new THREE.Vector3(0, 0, 0);
+    const duration = 1500;
+    const t0 = Date.now();
+    function step() {
+      const t = Math.min(1, (Date.now() - t0) / duration);
+      camera.position.lerpVectors(startPos, targetPos, t);
+      controls.target.lerpVectors(startTarget, targetLook, t);
+      controls.update();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    step();
+  }
+
   // Animation loop
   function animate() {
     requestAnimationFrame(animate);
@@ -844,7 +884,7 @@ export function setupSolarSystem(
   }
 
   // Expose API
-  (window as any).solarSystem = { updateSimulationSpeed, followPlanet, stopFollowPlanet, getFollowingPlanetId: () => followPlanetId };
+  (window as any).solarSystem = { updateSimulationSpeed, followPlanet, stopFollowPlanet, getFollowingPlanetId: () => followPlanetId, resetCamera };
   return {
     selectPlanet: (planetId: string) => {
       const p = planetData.find(p => p.id === planetId);
@@ -861,6 +901,7 @@ export function setupSolarSystem(
     followPlanet,
     stopFollowPlanet,
     getFollowingPlanetId: () => followPlanetId,
+    resetCamera,
     isGalaxyVisible: () => false
   };
 }

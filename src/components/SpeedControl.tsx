@@ -30,7 +30,7 @@ const SpeedControl: React.FC<SpeedControlProps> = ({
   const { t } = useLanguage();
   
   return (
-    <div className="bg-black/60 backdrop-blur-sm rounded-lg p-3 text-white flex items-center gap-3">
+    <div className="liquid-glass liquid-glass-glow rounded-xl p-3 text-white flex items-center gap-3">
       <Clock size={18} className="text-gray-400" />
       <div className="flex flex-col">
         <div className="text-sm font-medium mb-1">{t('simulationSpeed')}</div>
@@ -52,7 +52,7 @@ const SpeedControl: React.FC<SpeedControlProps> = ({
       <div className="text-sm font-bold ml-2">{speed.toFixed(1)}x</div>
       <button
         onClick={onPauseToggle}
-        className="ml-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+        className="ml-4 p-2 liquid-glass-button shiny-border-hover"
         aria-label={paused ? t('play') : t('pause')}
         type="button"
       >

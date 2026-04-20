@@ -59,18 +59,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   if (isMoon) {
     // Translate moon name
     const moonNameKey = planet.name.toLowerCase().replace(/\s+/g, '');
-    const translatedMoonName = t(moonNameKey);
+    const translatedMoonName = t(moonNameKey as any);
     // Only use translation if we got back something different (actual translation found)
     if (translatedMoonName && translatedMoonName !== moonNameKey) {
       displayName = translatedMoonName;
     }
     
     // Translate description and fun fact
-    translatedDescription = `${t('moonOf')} ${t(parentId) || parentId}.`;
+    translatedDescription = `${t('moonOf')} ${t(parentId as any) || parentId}.`;
     translatedFunFact = `${t('clickLearnMore')}.`;
   }
   
-  const parentLabel = parentId ? ` • ${t('moonOf')} ${t(parentId) || parentId}` : '';
+  const parentLabel = parentId ? ` • ${t('moonOf')} ${t(parentId as any) || parentId}` : '';
   
   const translationKeys = getPlanetTranslationKeys(planet.id);
   const displayDescription = translationKeys ? t(translationKeys.description) : (isMoon ? translatedDescription : planet.description);
@@ -90,18 +90,18 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   };
 
   return (
-    <div className="absolute top-20 right-5 w-80 bg-black/90 backdrop-blur-md text-white rounded-2xl overflow-hidden z-20 shadow-2xl border border-white/10 animate-slideIn transition-all duration-500">
+    <div className="absolute top-20 right-5 w-80 liquid-glass liquid-glass-glow text-white rounded-2xl overflow-hidden z-20 animate-slideIn transition-all duration-500">
       <div className="relative">
         <button 
           onClick={onClose}
-          className={`absolute top-3 ${language === 'ar' ? 'left-3' : 'right-3'} p-1 rounded-full hover:bg-white/20 transition-colors`}
+          className={`absolute top-3 ${language === 'ar' ? 'left-3' : 'right-3'} p-1 liquid-glass-button shiny-border-hover`}
         >
           <X size={20} />
         </button>
         
         <div className="p-5">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-2xl font-bold">{isMoon ? displayName : (t(planet.id) || planet.name)}{parentLabel}</h2>
+            <h2 className="text-2xl font-bold">{isMoon ? displayName : (t(planet.id as any) || planet.name)}{parentLabel}</h2>
             {!isMoon && planet.id !== 'sun' && solarApi && (
               <button
                 onClick={() => {
@@ -112,7 +112,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                     solarApi.followPlanet?.(planet.id, height, true);
                   }
                 }}
-                className="ml-2 px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-sm"
+                className="ml-2 px-3 py-1 liquid-glass-button shiny-border-hover text-sm"
               >
                 {solarApi.getFollowingPlanetId && solarApi.getFollowingPlanetId() === planet.id ? t('stopStanding') || 'Stop Standing' : t('stand') || 'Stand'}
               </button>
@@ -123,14 +123,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           {showComparison && (
             <div className="flex gap-2 mb-4">
               <button
-                className={`px-3 py-1 rounded bg-blue-500 text-white text-xs font-semibold disabled:bg-gray-600`}
+                className={`px-3 py-1 liquid-glass-button shiny-border-hover text-xs font-semibold disabled:opacity-50`}
                 onClick={() => onChooseAsA && onChooseAsA(planet)}
                 disabled={comparisonPlanets?.planetA?.id === planet.id}
               >
                 {comparisonPlanets?.planetA?.id === planet.id ? t('chosenAsA') : t('chooseAsA')}
               </button>
               <button
-                className={`px-3 py-1 rounded bg-green-500 text-white text-xs font-semibold disabled:bg-gray-600`}
+                className={`px-3 py-1 liquid-glass-button shiny-border-hover text-xs font-semibold disabled:opacity-50`}
                 onClick={() => onChooseAsB && onChooseAsB(planet)}
                 disabled={
                   comparisonPlanets?.planetB?.id === planet.id ||
@@ -178,7 +178,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <div className="flex flex-wrap gap-1">
                   {planet.moons.slice(0, 5).map((moon, index) => (
                     <span key={index} className="bg-white/10 px-2 py-1 rounded-full text-xs">
-                      {language === 'ar' ? (t(moon.name.toLowerCase().replace(/\s+/g, '')) || moon.name) : moon.name}
+                      {language === 'ar' ? (t(moon.name.toLowerCase().replace(/\s+/g, '') as any) || moon.name) : moon.name}
                     </span>
                   ))}
                   {planet.moons.length > 5 && (
@@ -200,7 +200,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 href={nasaUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`inline-flex items-center gap-2 mt-2 px-4 py-2 bg-black border border-white/20 hover:border-blue-400 hover:shadow-[0_0_12px_0_rgba(59,130,246,0.4)] text-white font-semibold rounded-lg transition-all duration-300 focus:ring-2 focus:ring-blue-400 focus:outline-none ${loading ? 'opacity-70 pointer-events-none' : ''}`}
+                className={`inline-flex items-center gap-2 mt-2 px-4 py-2 liquid-glass-button shiny-border-hover text-white font-semibold ${loading ? 'opacity-70 pointer-events-none' : ''}`}
                 onClick={() => setLoading(true)}
               >
                 {loading && (

@@ -42,20 +42,20 @@ const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
     : null;
 
   return (
-    <div className="absolute top-20 left-1/2 transform -translate-x-1/2 w-[600px] max-w-[90vw] bg-black/80 backdrop-blur-md text-white rounded-lg overflow-hidden z-20 transition-all duration-300 ease-in-out animate-slideIn">
+    <div className="absolute top-20 left-1/2 transform -translate-x-1/2 w-[600px] max-w-[90vw] liquid-glass liquid-glass-glow text-white rounded-2xl overflow-hidden z-20 transition-all duration-300 ease-in-out animate-slideIn">
       <div className="relative">
         <div className="flex justify-between items-center p-4 border-b border-white/20">
           <h2 className="text-xl font-bold">{t('planetComparison')}</h2>
           <div className="flex gap-2">
             <button 
               onClick={onReset}
-              className="px-3 py-1 text-sm rounded bg-white/10 hover:bg-white/20 transition-colors"
+              className="liquid-glass-button shiny-border-hover px-3 py-1 text-sm"
             >
               {t('reset')}
             </button>
             <button 
               onClick={onClose}
-              className="p-1 rounded-full hover:bg-white/20 transition-colors"
+              className="liquid-glass-button shiny-border-hover p-1"
             >
               <X size={20} />
             </button>
@@ -87,11 +87,11 @@ const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 
                 <div className="col-span-1">
                   <h3 className={`text-center border-b border-gray-700 pb-2 mb-2 ${planetA ? 'text-white' : 'text-gray-500'}`}>
-                    {planetA ? t(planetA.id) || planetA.name : t('selectPlanetA')}
+                    {planetA ? t(planetA.id as any) || planetA.name : t('selectPlanetA')}
                   </h3>
                   {planetA ? (
                     <div className="space-y-3">
-                      <p className="py-1 text-center">{t(planetA.id) || planetA.name}</p>
+                      <p className="py-1 text-center">{t(planetA.id as any) || planetA.name}</p>
                       <p className="py-1 text-center">{planetA.diameter.toLocaleString()} km</p>
                       <p className="py-1 text-center">{planetA.mass}</p>
                       <p className="py-1 text-center">{translateTimeValue(planetA.dayLength)}</p>
@@ -110,11 +110,11 @@ const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 
                 <div className="col-span-1">
                   <h3 className={`text-center border-b border-gray-700 pb-2 mb-2 ${planetB ? 'text-white' : 'text-gray-500'}`}>
-                    {planetB ? t(planetB.id) || planetB.name : t('selectPlanetB')}
+                    {planetB ? t(planetB.id as any) || planetB.name : t('selectPlanetB')}
                   </h3>
                   {planetB ? (
                     <div className="space-y-3">
-                      <p className="py-1 text-center">{t(planetB.id) || planetB.name}</p>
+                      <p className="py-1 text-center">{t(planetB.id as any) || planetB.name}</p>
                       <p className="py-1 text-center">{planetB.diameter.toLocaleString()} km</p>
                       <p className="py-1 text-center">{planetB.mass}</p>
                       <p className="py-1 text-center">{translateTimeValue(planetB.dayLength)}</p>
@@ -140,15 +140,15 @@ const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                     <p>
                       <span className="text-gray-300">{t('sizeDifference')}:</span>{' '}
                       {planetA.diameter > planetB.diameter && planetB.diameter !== 0
-                        ? `${t(planetA.id) || planetA.name} ${t('is')} ${(planetA.diameter / planetB.diameter).toFixed(1)}x ${t('larger')} ${t('than')} ${t(planetB.id) || planetB.name}`
+                        ? `${t(planetA.id as any) || planetA.name} ${t('is')} ${(planetA.diameter / planetB.diameter).toFixed(1)}x ${t('larger')} ${t('than')} ${t(planetB.id as any) || planetB.name}`
                         : planetB.diameter > planetA.diameter && planetA.diameter !== 0
-                        ? `${t(planetB.id) || planetB.name} ${t('is')} ${(planetB.diameter / planetA.diameter).toFixed(1)}x ${t('larger')} ${t('than')} ${t(planetA.id) || planetA.name}`
+                        ? `${t(planetB.id as any) || planetB.name} ${t('is')} ${(planetB.diameter / planetA.diameter).toFixed(1)}x ${t('larger')} ${t('than')} ${t(planetA.id as any) || planetA.name}`
                         : t('sameSizeMoons')}
                     </p>
                     <p>
                       <span className="text-gray-300">{t('orbitalSpeedRatio')}:</span>{' '}
                       {speedRatio && planetB.orbitSpeed !== 0
-                        ? `${t(planetA.id) || planetA.name} ${t('is')} ${speedRatio}x ${parseFloat(speedRatio) > 1 ? t('faster') : t('slower')} ${t('than')} ${t(planetB.id) || planetB.name}`
+                        ? `${t(planetA.id as any) || planetA.name} ${t('is')} ${speedRatio}x ${parseFloat(speedRatio) > 1 ? t('faster') : t('slower')} ${t('than')} ${t(planetB.id as any) || planetB.name}`
                         : 'N/A'}
                     </p>
                     <p>

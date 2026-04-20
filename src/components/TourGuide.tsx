@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { planetData, PlanetData } from '../data/planetData';
+import { tourContent } from '../data/tourContent';
 import { useLanguage } from '../context/LanguageContext';
 
 interface TourGuideProps {
@@ -10,42 +11,26 @@ interface TourGuideProps {
 
 const EMOJI: Record<string, string> = {
   sun: '☀️',
-  mercury: '☿',
-  venus: '♀️',
+  mercury: '🔴',
+  venus: '🟡',
   earth: '🌍',
-  mars: '⛰️',
+  mars: '🔴',
   jupiter: '🟠',
   saturn: '🪐',
   uranus: '🔵',
   neptune: '🔵'
 };
 
-function emphasizeIfExtreme(text: string) {
-  const extremeKeywords = /largest|most|only|unique|volcan|strongest|shortest|longest|fastest|biggest/i;
+function emphasizeIfExtreme(text: string, isArabic: boolean = false) {
+  const extremeKeywords = /largest|most|only|unique|volcan|strongest|shortest|longest|fastest|biggest|أكبر|أقوى|أسرع|أطول|أقصر|وحيد|فريد/i;
   if (extremeKeywords.test(text)) {
     return (
       <>
-        {text} <span className="text-red-400 font-bold">Booooooom!! 💥</span>
+        {text} <span className="text-red-400 font-bold">{isArabic ? 'بوووووم!! 💥' : 'Booooooom!! 💥'}</span>
       </>
     );
   }
   return text;
-}
-
-function friendlyMassExplanation(massStr: string) {
-  // Try to parse patterns like '1.90 × 10^27 kg'
-  const m = massStr.match(/([0-9.]+)\s*×\s*10\^([0-9]+)/);
-  if (m) {
-    const base = parseFloat(m[1]);
-    const exp = parseInt(m[2], 10);
-    // playful line — avoid precise huge-number math
-    return (
-      <span>
-        That's about <span className="font-semibold text-yellow-300">{base}×10^{exp} kg</span> — imagine doubling your house weight <span className="font-semibold text-pink-300">thousands of millions</span> of times!
-      </span>
-    );
-  }
-  return <span className="font-semibold text-yellow-300">{massStr}</span>;
 }
 
 const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose }) => {
@@ -53,53 +38,61 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
   const planets = planetData as PlanetData[];
   const [planetIndex, setPlanetIndex] = useState(0);
   const [sectionIndex, setSectionIndex] = useState(0);
+  const [showCompletion, setShowCompletion] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setPlanetIndex(0);
     setSectionIndex(0);
+    setShowCompletion(false);
   }, [isOpen]);
 
   const sectionsFor = useMemo(() => (p: PlanetData) => {
-    // Build a short story-like sequence for each planet
+    // Build a short story-like sequence for each planet using custom content
     const emoji = EMOJI[p.id] || '✨';
+    const isArabic = language === 'ar';
+    const content = tourContent[p.id] || tourContent.mercury;
+    // Get translated fun fact
+    const funFactKey = `${p.id}FunFact` as any;
+    const translatedFunFact = t(funFactKey) || p.funFact;
     return [
       {
         key: 'prologue',
-        title: `${emoji} ${p.name}`,
+        title: isArabic ? `${emoji} ${t(p.id as any) || p.name}` : `${emoji} ${p.name}`,
         content: (
           <div>
-            <p className="mb-1">Once upon a time, <span className="font-semibold text-blue-300">{p.name}</span> {emoji} drifted around the Sun.</p>
-            <p className="text-sm text-gray-300">{p.description.slice(0, 120)}{p.description.length > 120 ? '...' : ''}</p>
+            <p className="mb-2 text-sm leading-relaxed">
+              {isArabic ? content.prologue.ar : content.prologue.en}
+            </p>
           </div>
         ),
         highlight: true
       },
       {
         key: 'story',
-        title: `A little story`,
+        title: isArabic ? 'اكتشف المزيد' : 'Discover More',
         content: (
           <div>
-            <p className="mb-1">
-              {`People call ${p.name} `}
-              <span className="font-semibold text-yellow-300">{p.name}</span>
-              {` — but do you know what that really means?`}
+            <p className="mb-2 text-sm leading-relaxed">
+              {isArabic ? content.story.ar : content.story.en}
             </p>
-            <p className="text-sm text-gray-300">{friendlyMassExplanation(p.mass)} </p>
+            <p className="text-xs text-gray-400 italic mt-2 border-t border-white/10 pt-2">
+              {isArabic ? content.massExplanation.ar : content.massExplanation.en}
+            </p>
           </div>
         ),
-        highlight: false
+        highlight: true
       },
       {
         key: 'fun',
-        title: `Listen!`,
+        title: isArabic ? 'هل تعلم؟' : 'Did You Know?',
         content: (
           <div>
-            <p className="mb-1 text-pink-300 font-semibold">Fun Fact</p>
-            <p className="text-sm text-gray-200">{emphasizeIfExtreme(p.funFact)}</p>
+            <p className="mb-1 text-pink-300 font-semibold">{isArabic ? 'حقيقة مذهلة' : 'Amazing Fact'}</p>
+            <p className="text-sm text-gray-200 leading-relaxed">{emphasizeIfExtreme(translatedFunFact, isArabic)}</p>
           </div>
         ),
-        highlight: false
+        highlight: true
       }
     ];
   }, [t, language]);
@@ -125,8 +118,65 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
 
   if (!isOpen) return null;
 
+  if (showCompletion) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm">
+        <div className="relative liquid-glass liquid-glass-glow p-8 rounded-3xl max-w-lg text-center">
+          {/* Glitter effects */}
+          <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+            {[...Array(20)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-2 h-2 bg-yellow-300 rounded-full animate-pulse"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 2}s`,
+                  opacity: Math.random() * 0.7 + 0.3
+                }}
+              />
+            ))}
+            {[...Array(15)].map((_, i) => (
+              <div
+                key={`star-${i}`}
+                className="absolute text-2xl"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 3}s`,
+                  transform: `rotate(${Math.random() * 360}deg)`
+                }}
+              >
+                ✨
+              </div>
+            ))}
+          </div>
+          
+          <div className="relative z-10">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-3xl font-bold text-white mb-4">
+              {language === 'ar' ? 'مبروك يا صاحبي!' : 'Congratulations!'}
+            </h2>
+            <p className="text-lg text-gray-200 mb-6">
+              {language === 'ar' 
+                ? 'خلصت جولة النظام الشمسي أونلاين يا بطل!'
+                : 'You have completed the Solar System Online Tour!'}
+            </p>
+            <button
+              onClick={handleFinishTour}
+              className="px-8 py-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              {language === 'ar' ? 'تمام' : 'Awesome'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const planet = planets[planetIndex];
   const sections = sectionsFor(planet);
+  const isLastSection = planetIndex === planets.length - 1 && sectionIndex === sections.length - 1;
 
   function handleNext() {
     if (sectionIndex < sections.length - 1) {
@@ -135,7 +185,9 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
       setPlanetIndex(planetIndex + 1);
       setSectionIndex(0);
     } else {
-      onClose?.();
+      // Tour completed - show completion screen
+      setShowCompletion(true);
+      solarApi?.resetCamera?.();
     }
   }
 
@@ -151,31 +203,51 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
 
   function handleSkip() {
     solarApi?.stopFollowPlanet?.();
+    solarApi?.resetCamera?.();
     onClose?.();
   }
 
+  function handleFinishTour() {
+    solarApi?.stopFollowPlanet?.();
+    solarApi?.resetCamera?.();
+    onClose?.();
+  }
+
+  const isArabic = language === 'ar';
+
   return (
-    <div className="absolute left-5 top-16 w-96 bg-black/95 text-white p-4 rounded-2xl z-40 border border-white/10 shadow-2xl">
+    <div className="absolute left-5 top-16 w-96 liquid-glass liquid-glass-glow text-white p-4 rounded-2xl z-40">
       <div className="flex items-center justify-between mb-3">
         <div className="font-bold text-lg">{t('tourGuide') || 'Tour Guide'}</div>
         <div className="flex items-center gap-2">
-          <button onClick={handleSkip} className="text-sm px-3 py-1 bg-white/6 rounded hover:bg-white/10">{t('skip') || 'Skip'}</button>
+          <button onClick={handleSkip} className="text-sm px-3 py-1 liquid-glass-button">{t('skip') || 'Skip'}</button>
         </div>
       </div>
 
       <div className="mb-4">
-        <div className="text-sm text-gray-400 mb-1">{(t(planet.id) || planet.name)}</div>
-        <div className="text-lg font-extrabold text-white mb-1 flex items-center gap-2">
+        <div className="text-sm text-gray-400 mb-1" dir={isArabic ? 'rtl' : 'ltr'}>{(t(planet.id as any) || planet.name)}</div>
+        <div className="text-lg font-extrabold text-white mb-1 flex items-center gap-2" dir={isArabic ? 'rtl' : 'ltr'}>
           <span className="text-2xl">{EMOJI[planet.id] || '✨'}</span>
           <span>{sections[sectionIndex].title}</span>
         </div>
-        <div className="text-sm text-gray-200">{sections[sectionIndex].content}</div>
+        <div className="text-sm text-gray-200" dir={isArabic ? 'rtl' : 'ltr'}>{sections[sectionIndex].content}</div>
       </div>
 
       <div className="flex justify-between items-center">
-        <button onClick={handlePrev} disabled={planetIndex === 0 && sectionIndex === 0} className="px-3 py-1 bg-white/6 rounded disabled:opacity-40">◀</button>
+        <button onClick={handlePrev} disabled={planetIndex === 0 && sectionIndex === 0} className="px-3 py-1 liquid-glass-button disabled:opacity-40">◀</button>
         <div className="flex items-center gap-2">
-          <button onClick={handleNext} className="px-4 py-2 bg-gradient-to-br from-purple-600 to-blue-500 rounded text-white font-bold">{t('next') || 'Next'}</button>
+          <button 
+            onClick={handleNext} 
+            className={`px-4 py-2 liquid-glass-button shiny-border-hover text-white font-bold ${
+              isLastSection 
+                ? '!bg-gradient-to-br !from-green-500/80 !to-emerald-600/80' 
+                : ''
+            }`}
+          >
+            {isLastSection 
+              ? (t('finishTour') || 'Finish the Tour') 
+              : (t('next') || 'Next')}
+          </button>
         </div>
       </div>
     </div>
