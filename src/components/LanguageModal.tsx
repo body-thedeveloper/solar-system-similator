@@ -24,7 +24,7 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999]">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[99999]">
       <div className="liquid-glass liquid-glass-glow rounded-3xl p-10 max-w-md w-full mx-4 animate-fadeIn">
         <div className="flex justify-center mb-8">
           <div className="p-4 bg-gradient-to-br from-cyan-500/30 to-blue-500/20 rounded-full border border-cyan-400/50">
@@ -48,7 +48,7 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
                 : 'text-white hover:scale-105'
             }`}
           >
-            <span className="text-2xl mr-3">🇬🇧</span> {t('english')}
+            <span className="text-2xl mr-3">🇺🇸</span> {t('english')}
           </button>
           
           <button

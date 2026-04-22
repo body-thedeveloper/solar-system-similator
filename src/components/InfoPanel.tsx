@@ -46,8 +46,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(false);
-  const isStanding = !!solarApi && ((solarApi.getFollowingPlanetId && solarApi.getFollowingPlanetId() === planet.id));
-
+  
   const parentId = (planet as any).parentId;
   const isMoon = (planet as any).isMoon || parentId;
   
@@ -90,47 +89,32 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   };
 
   return (
-    <div className="absolute top-20 right-5 w-80 liquid-glass liquid-glass-glow text-white rounded-2xl overflow-hidden z-20 animate-slideIn transition-all duration-500">
+    <div className={`absolute top-20 ${language === 'ar' ? 'left-5' : 'right-5'} w-80 liquid-glass text-white rounded-2xl overflow-hidden z-20 animate-slideIn transition-all duration-500`}>
       <div className="relative">
         <button 
           onClick={onClose}
-          className={`absolute top-3 ${language === 'ar' ? 'left-3' : 'right-3'} p-1 liquid-glass-button shiny-border-hover`}
+          className={`absolute top-3 ${language === 'ar' ? 'left-3' : 'right-3'} p-1 liquid-glass-button`}
         >
           <X size={20} />
         </button>
         
         <div className="p-5">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center mb-1">
             <h2 className="text-2xl font-bold">{isMoon ? displayName : (t(planet.id as any) || planet.name)}{parentLabel}</h2>
-            {!isMoon && planet.id !== 'sun' && solarApi && (
-              <button
-                onClick={() => {
-                  if (solarApi.getFollowingPlanetId && solarApi.getFollowingPlanetId() === planet.id) {
-                    solarApi.stopFollowPlanet?.();
-                  } else {
-                    const height = Math.max(1, planet.radius + 0.6);
-                    solarApi.followPlanet?.(planet.id, height, true);
-                  }
-                }}
-                className="ml-2 px-3 py-1 liquid-glass-button shiny-border-hover text-sm"
-              >
-                {solarApi.getFollowingPlanetId && solarApi.getFollowingPlanetId() === planet.id ? t('stopStanding') || 'Stop Standing' : t('stand') || 'Stand'}
-              </button>
-            )}
           </div>
           <div className="w-full h-0.5 bg-white/20 mb-4"></div>
           
           {showComparison && (
             <div className="flex gap-2 mb-4">
               <button
-                className={`px-3 py-1 liquid-glass-button shiny-border-hover text-xs font-semibold disabled:opacity-50`}
+                className={`px-3 py-1 liquid-glass-button text-xs font-semibold disabled:opacity-50`}
                 onClick={() => onChooseAsA && onChooseAsA(planet)}
                 disabled={comparisonPlanets?.planetA?.id === planet.id}
               >
                 {comparisonPlanets?.planetA?.id === planet.id ? t('chosenAsA') : t('chooseAsA')}
               </button>
               <button
-                className={`px-3 py-1 liquid-glass-button shiny-border-hover text-xs font-semibold disabled:opacity-50`}
+                className={`px-3 py-1 liquid-glass-button text-xs font-semibold disabled:opacity-50`}
                 onClick={() => onChooseAsB && onChooseAsB(planet)}
                 disabled={
                   comparisonPlanets?.planetB?.id === planet.id ||
@@ -175,7 +159,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
             {planet.moons && planet.moons.length > 0 && (
               <div>
                 <h3 className="text-gray-400 mb-1">{t('moons')} ({planet.moons.length})</h3>
-                <div className="flex flex-wrap gap-1">
+                <div className={`flex flex-wrap gap-1 ${language === 'ar' ? 'justify-end' : 'justify-start'}`}>
                   {planet.moons.slice(0, 5).map((moon, index) => (
                     <span key={index} className="bg-white/10 px-2 py-1 rounded-full text-xs">
                       {language === 'ar' ? (t(moon.name.toLowerCase().replace(/\s+/g, '') as any) || moon.name) : moon.name}
@@ -200,7 +184,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 href={nasaUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`inline-flex items-center gap-2 mt-2 px-4 py-2 liquid-glass-button shiny-border-hover text-white font-semibold ${loading ? 'opacity-70 pointer-events-none' : ''}`}
+                className={`inline-flex items-center gap-2 mt-2 px-4 py-2 liquid-glass-button text-white font-semibold ${loading ? 'opacity-70 pointer-events-none' : ''}`}
                 onClick={() => setLoading(true)}
               >
                 {loading && (

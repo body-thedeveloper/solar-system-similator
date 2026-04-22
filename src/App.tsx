@@ -6,7 +6,11 @@ import ComparisonPanel from './components/ComparisonPanel';
 import LanguageModal from './components/LanguageModal';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import TourGuide from './components/TourGuide';
+import QuizStageSelection from './components/QuizStageSelection';
+import Quiz from './components/Quiz';
+import QuizResults from './components/QuizResults';
 import { PlanetData } from './data/planetData';
+import { QuizStage } from './data/quizData';
 import { Sun, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
 import { useLanguage } from './context/LanguageContext';
 
@@ -22,8 +26,8 @@ function App() {
   }>({ planetA: null, planetB: null });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showLanguageModal, setShowLanguageModal] = useState<boolean>(() => {
-    // Show modal only if no language has been selected yet
-    return !localStorage.getItem('language');
+    // Always show modal on first load to ensure language selection works
+    return true;
   });
   const [paused, setPaused] = useState<boolean>(false);
   const [hideMoons, setHideMoons] = useState(false);
@@ -32,6 +36,11 @@ function App() {
   const [solarApi, setSolarApi] = useState<any>(null);
   const [galaxyVisible, setGalaxyVisible] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  const [showQuizSelection, setShowQuizSelection] = useState(false);
+  const [selectedQuizStage, setSelectedQuizStage] = useState<QuizStage | null>(null);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [showQuizResults, setShowQuizResults] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -183,8 +192,41 @@ function App() {
     if (!showComparison) setShowComparison(true);
   };
 
+  // Quiz handlers
+  const handleQuizClick = () => {
+    setShowTour(false);
+    setSelectedPlanet(null);
+    setShowQuizSelection(true);
+  };
+
+  const handleQuizStageSelect = (stage: QuizStage) => {
+    setSelectedQuizStage(stage);
+    setShowQuizSelection(false);
+    setShowQuiz(true);
+  };
+
+  const handleQuizComplete = (score: number, totalQuestions: number) => {
+    setQuizScore(score);
+    setShowQuiz(false);
+    setShowQuizResults(true);
+  };
+
+  const handleQuizClose = () => {
+    setShowQuizSelection(false);
+    setShowQuiz(false);
+    setShowQuizResults(false);
+    setSelectedQuizStage(null);
+  };
+
+  const handleQuizRetry = () => {
+    if (selectedQuizStage) {
+      setShowQuizResults(false);
+      setShowQuiz(true);
+    }
+  };
+
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
+    <div className={`relative w-full h-screen overflow-hidden bg-black ${language === 'ar' ? 'arabic-text' : 'english-text'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* Language Selection Modal */}
       <LanguageModal 
         isOpen={showLanguageModal}
@@ -215,7 +257,7 @@ function App() {
         <div className="flex items-center gap-2">
           {/* Zoom Out Button */}
           <button
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            className="p-2 rounded-full liquid-glass-button transition-colors"
             aria-label="Zoom Out"
             onClick={() => solarApi?.zoomOut?.()}
             type="button"
@@ -237,7 +279,7 @@ function App() {
           />
           {/* Zoom In Button */}
           <button
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            className="p-2 rounded-full liquid-glass-button transition-colors"
             aria-label="Zoom In"
             onClick={() => solarApi?.zoomIn?.()}
             type="button"
@@ -274,8 +316,8 @@ function App() {
       <div className={`absolute top-5 right-5 z-10 flex items-center gap-4 ${language === 'ar' ? 'space-x-reverse' : ''}`}>
         <LanguageSwitcher />
         <button 
-          className={`px-4 py-2 rounded-lg font-semibold text-sm ${
-            showComparison ? 'bg-blue-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
+          className={`px-4 py-2 rounded-lg font-semibold text-sm liquid-glass-button ${
+            showComparison ? 'bg-blue-500/20 border-blue-500/30' : ''
           }`}
           onClick={handleToggleComparison}
         >
@@ -283,23 +325,47 @@ function App() {
         </button>
       </div>
 
-      {/* Tour button - positioned at left top corner */}
-      <div className="absolute top-5 left-5 z-10">
+      {/* Tour and Quiz buttons - positioned at left top corner */}
+      <div className="absolute top-5 left-5 z-10 flex flex-col gap-2">
         <button
-          className={`px-4 py-2 rounded-lg font-semibold text-sm shadow-lg transition-all duration-300 relative overflow-hidden group ${
-            showTour 
-              ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 hover:shadow-red-500/50 hover:shadow-xl' 
-              : 'bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-400 text-white hover:from-purple-700 hover:via-blue-600 hover:to-cyan-500 hover:shadow-purple-500/50 hover:shadow-xl hover:scale-105'
+          className={`px-4 py-2 rounded-lg font-semibold text-sm liquid-glass-button transition-all duration-200 ${
+            showTour ? 'bg-red-500/20 border-red-500/30' : ''
           }`}
           onClick={() => { setShowTour((s) => { const next = !s; if (next) { setSelectedPlanet(null); } return next; }); }}
         >
-          <span className="absolute inset-0 rounded-lg bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></span>
-          <span className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm bg-gradient-to-r from-purple-500/50 via-blue-500/50 to-cyan-400/50"></span>
-          <span className="relative z-10">{showTour ? (t('stopTour') || 'Stop Tour') : (t('startTour') || 'Start Tour')}</span>
+          {showTour ? (t('stopTour') || 'Stop Tour') : (t('startTour') || 'Start Tour')}
+        </button>
+        <button
+          className="px-4 py-2 rounded-lg font-semibold text-sm liquid-glass-button transition-all duration-200 bg-blue-500/20 border-blue-500/30"
+          onClick={handleQuizClick}
+        >
+          {t('takeQuiz') || 'Take Quiz'}
         </button>
       </div>
 
       <TourGuide solarApi={solarApi} isOpen={showTour} onClose={() => setShowTour(false)} />
+      {showQuizSelection && (
+        <QuizStageSelection 
+          onStageSelect={handleQuizStageSelect} 
+          onClose={handleQuizClose} 
+        />
+      )}
+      {showQuiz && selectedQuizStage && (
+        <Quiz 
+          stage={selectedQuizStage} 
+          onComplete={handleQuizComplete} 
+          onClose={handleQuizClose} 
+        />
+      )}
+      {showQuizResults && selectedQuizStage && (
+        <QuizResults 
+          stage={selectedQuizStage} 
+          score={quizScore} 
+          totalQuestions={selectedQuizStage.questions.length} 
+          onClose={handleQuizClose} 
+          onRetry={handleQuizRetry} 
+        />
+      )}
     </div>
   );
 }

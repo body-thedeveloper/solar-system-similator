@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { planetData, PlanetData } from '../data/planetData';
 import { tourContent } from '../data/tourContent';
 import { useLanguage } from '../context/LanguageContext';
+import QuizStageSelection from './QuizStageSelection';
+import Quiz from './Quiz';
+import QuizResults from './QuizResults';
+import { QuizStage } from '../data/quizData';
 
 interface TourGuideProps {
   solarApi: any;
@@ -39,12 +43,22 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
   const [planetIndex, setPlanetIndex] = useState(0);
   const [sectionIndex, setSectionIndex] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [showQuizSelection, setShowQuizSelection] = useState(false);
+  const [selectedQuizStage, setSelectedQuizStage] = useState<QuizStage | null>(null);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
     setPlanetIndex(0);
     setSectionIndex(0);
     setShowCompletion(false);
+    setShowQuizSelection(false);
+    setSelectedQuizStage(null);
+    setShowQuiz(false);
+    setShowResults(false);
+    setQuizScore(0);
   }, [isOpen]);
 
   const sectionsFor = useMemo(() => (p: PlanetData) => {
@@ -101,19 +115,28 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
     if (!isOpen) return;
     const p = planets[planetIndex];
     if (!p) return;
-    // Always make camera focus on the planet when we move to it
-    solarApi?.selectPlanet?.(p.id);
+    
+    // Smooth transition to planet
     const secs = sectionsFor(p);
     const sec = secs[sectionIndex];
-    // if the section requests a highlight, move camera near (follow) the planet briefly
-    if (sec && sec.highlight) {
-      // follow close to surface
-      const height = Math.max(1, p.radius + 0.6);
-      solarApi?.followPlanet?.(p.id, height, true);
-    } else {
-      // stop following if previously followed
-      solarApi?.stopFollowPlanet?.();
-    }
+    
+    // First stop any following to prevent conflicts
+    solarApi?.stopFollowPlanet?.();
+    
+    // Add delay to prevent zooming glitch
+    setTimeout(() => {
+      // Select planet with smooth transition
+      solarApi?.selectPlanet?.(p.id);
+      
+      // if the section requests a highlight, move camera near the planet
+      if (sec && sec.highlight) {
+        // follow close to surface with smooth transition
+        setTimeout(() => {
+          const height = Math.max(1.5, p.radius + 0.8); // Slightly higher for better view
+          solarApi?.followPlanet?.(p.id, height, true);
+        }, 200); // Additional delay to prevent glitch
+      }
+    }, 100); // Delay to prevent zooming glitch
   }, [isOpen, planetIndex, sectionIndex, solarApi, sectionsFor, planets]);
 
   if (!isOpen) return null;
@@ -162,12 +185,20 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
                 ? 'خلصت جولة النظام الشمسي أونلاين يا بطل!'
                 : 'You have completed the Solar System Online Tour!'}
             </p>
-            <button
-              onClick={handleFinishTour}
-              className="px-8 py-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              {language === 'ar' ? 'تمام' : 'Awesome'}
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={handleTakeQuiz}
+                className="px-6 py-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl text-white font-bold text-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                {language === 'ar' ? 'خذ اختبار' : 'Take Quiz'}
+              </button>
+              <button
+                onClick={handleFinishTour}
+                className="px-6 py-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl text-white font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                {language === 'ar' ? 'تمام' : 'Awesome'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -186,8 +217,13 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
       setSectionIndex(0);
     } else {
       // Tour completed - show completion screen
-      setShowCompletion(true);
-      solarApi?.resetCamera?.();
+      solarApi?.stopFollowPlanet?.();
+      setTimeout(() => {
+        solarApi?.resetCamera?.();
+        setTimeout(() => {
+          setShowCompletion(true);
+        }, 500); // Give camera time to reset
+      }, 200);
     }
   }
 
@@ -202,18 +238,97 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
   }
 
   function handleSkip() {
+    // Stop following but don't reset camera to maintain planet positions
     solarApi?.stopFollowPlanet?.();
-    solarApi?.resetCamera?.();
-    onClose?.();
+    setTimeout(() => {
+      // Don't reset camera - just stop following and close
+      onClose?.();
+    }, 200);
   }
 
   function handleFinishTour() {
+    // Stop following but don't reset camera to maintain planet positions
     solarApi?.stopFollowPlanet?.();
-    solarApi?.resetCamera?.();
-    onClose?.();
+    setTimeout(() => {
+      // Ensure simulation continues after tour ends
+      solarApi?.updateSimulationSpeed?.(0.5);
+      setTimeout(() => {
+        onClose?.();
+      }, 200);
+    }, 100);
+  }
+
+  function handleTakeQuiz() {
+    setShowCompletion(false);
+    setShowQuizSelection(true);
+  }
+
+  function handleQuizStageSelect(stage: QuizStage) {
+    setSelectedQuizStage(stage);
+    setShowQuizSelection(false);
+    setShowQuiz(true);
+  }
+
+  function handleQuizComplete(score: number, totalQuestions: number) {
+    setQuizScore(score);
+    setShowQuiz(false);
+    setShowResults(true);
+  }
+
+  function handleQuizClose() {
+    setShowQuizSelection(false);
+    setShowQuiz(false);
+    setShowResults(false);
+    setSelectedQuizStage(null);
+  }
+
+  function handleQuizRetry() {
+    if (selectedQuizStage) {
+      setShowResults(false);
+      setShowQuiz(true);
+    }
+  }
+
+  function handleQuizFinish() {
+    handleQuizClose();
+    handleFinishTour();
   }
 
   const isArabic = language === 'ar';
+
+  // Show quiz stage selection
+  if (showQuizSelection) {
+    return (
+      <QuizStageSelection
+        onStageSelect={handleQuizStageSelect}
+        onClose={handleQuizClose}
+      />
+    );
+  }
+
+  // Show quiz
+  if (showQuiz && selectedQuizStage) {
+    return (
+      <Quiz
+        stage={selectedQuizStage}
+        onComplete={handleQuizComplete}
+        onClose={handleQuizClose}
+      />
+    );
+  }
+
+  // Show quiz results
+  if (showResults && selectedQuizStage) {
+    return (
+      <QuizResults
+        stage={selectedQuizStage}
+        score={quizScore}
+        totalQuestions={selectedQuizStage.questions.length}
+        onClose={handleQuizFinish}
+        onRetry={handleQuizRetry}
+      />
+    );
+  }
 
   return (
     <div className="absolute left-5 top-16 w-96 liquid-glass liquid-glass-glow text-white p-4 rounded-2xl z-40">
