@@ -18,7 +18,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({ stage, score, totalQuestions,
   const getPerformanceLevel = () => {
     if (percentage >= 80) {
       return {
-        emoji: 'ðŸ†',
+        emoji: '🏆',
         title: language === 'ar' ? 'ممتاز!' : 'Excellent!',
         message: language === 'ar' 
           ? 'أداء رائع! أنت تعرف نظامك الشمسي حقاً!' 
@@ -27,7 +27,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({ stage, score, totalQuestions,
       };
     } else if (percentage >= 60) {
       return {
-        emoji: 'â­',
+        emoji: '👍',
         title: language === 'ar' ? 'عمل جيد!' : 'Good Job!',
         message: language === 'ar' 
           ? 'عمل رائع! أنت تعرف الكثير عن نظامنا الشمسي!' 
@@ -36,7 +36,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({ stage, score, totalQuestions,
       };
     } else if (percentage >= 40) {
       return {
-        emoji: 'ðŸ“š',
+        emoji: '📚',
         title: language === 'ar' ? 'واصل التعلم!' : 'Keep Learning!',
         message: language === 'ar' 
           ? 'استمر في التعلم! ستحسن مع الوقت!' 
@@ -45,7 +45,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({ stage, score, totalQuestions,
       };
     } else {
       return {
-        emoji: 'ðŸŸŸ',
+        emoji: '🚀',
         title: language === 'ar' ? 'حاول مرة أخرى!' : 'Try Again!',
         message: language === 'ar' 
           ? 'حاول مرة أخرى! الممارسة تجعل الكمال!' 
@@ -86,7 +86,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({ stage, score, totalQuestions,
                   transform: `rotate(${Math.random() * 360}deg)`
                 }}
               >
-                âœ¨
+                ✨
               </div>
             ))}
           </div>

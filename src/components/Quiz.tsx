@@ -154,10 +154,10 @@ const Quiz: React.FC<QuizProps> = ({ stage, onComplete, onClose }) => {
                     </div>
                     <span className="text-lg">{optionText}</span>
                     {showExplanation && isCorrect && (
-                      <span className="ml-auto text-green-400">âœ“</span>
+                      <span className="ml-auto text-green-400">✓</span>
                     )}
                     {showExplanation && isSelected && !isCorrect && (
-                      <span className="ml-auto text-red-400">âœ—</span>
+                      <span className="ml-auto text-red-400">✗</span>
                     )}
                   </div>
                 </button>

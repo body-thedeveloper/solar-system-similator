@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { PlanetData } from '../data/planetData';
 import { useLanguage } from '../context/LanguageContext';
@@ -87,6 +87,45 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     translated = translated.replace(/days/g, t('days'));
     return translated;
   };
+
+  // Pin/follow planet when panel opens
+  useEffect(() => {
+    if (solarApi && planet) {
+      // Stop any existing following
+      solarApi?.stopFollowPlanet?.();
+      
+      // Check if this is a moon
+      const isMoon = (planet as any).isMoon;
+      const parentId = (planet as any).parentId;
+      const moonKey = isMoon && parentId ? `${parentId}:${planet.name}` : null;
+      
+      if (isMoon && moonKey && solarApi?.followMoon) {
+        // Pause the moon's orbital movement (keep self-rotation)
+        solarApi?.pauseMoonOrbit?.(moonKey);
+        
+        // Follow the moon
+        const height = Math.max(1.5, planet.radius + 0.8);
+        setTimeout(() => {
+          solarApi?.followMoon?.(moonKey, height, true);
+        }, 100);
+      } else {
+        // Select and follow the planet
+        solarApi?.selectPlanet?.(planet.id);
+        const height = Math.max(1.5, planet.radius + 0.8);
+        setTimeout(() => {
+          solarApi?.followPlanet?.(planet.id, height, true);
+        }, 100);
+      }
+    }
+    
+    // Cleanup: stop following and resume moon orbital movement when panel closes
+    return () => {
+      if (solarApi) {
+        solarApi?.stopFollowPlanet?.();
+        solarApi?.resumeMoonOrbit?.();
+      }
+    };
+  }, [planet, solarApi]);
 
   return (
     <div className={`absolute top-20 ${language === 'ar' ? 'left-5' : 'right-5'} w-80 liquid-glass text-white rounded-2xl overflow-hidden z-20 animate-slideIn transition-all duration-500`}>

@@ -141,6 +141,8 @@ export function setupSolarSystem(
   let hoveredOrbitId: string | null = null;
   // Camera follow (surface/standing) state
   let followPlanetId: string | null = null;
+  let followMoonKey: string | null = null;
+  let pausedMoonKey: string | null = null;
   let followPrevPos = new THREE.Vector3();
   let followEnabled = false;
   let followLockToSurface = false;
@@ -377,6 +379,18 @@ export function setupSolarSystem(
         const moonMesh = new THREE.Mesh(moonGeo, moonMat);
         moonMesh.castShadow = true;
         moonMesh.receiveShadow = true;
+
+        // Add larger invisible hit area for easier clicking
+        const hitAreaRadius = Math.max(visualMoonRadius * 3, 0.5);
+        const hitAreaGeo = new THREE.SphereGeometry(hitAreaRadius, 16, 16);
+        const hitAreaMat = new THREE.MeshBasicMaterial({ 
+          transparent: true, 
+          opacity: 0,
+          side: THREE.BackSide
+        });
+        const hitArea = new THREE.Mesh(hitAreaGeo, hitAreaMat);
+        hitArea.userData = moonMesh.userData;
+        moonMesh.add(hitArea);
 
         // Orbit radius around planet (local to planetGroup)
         let moonDistance = planet.radius * MOON_ORBIT_BASE + (idx * planet.radius * 1.1);
@@ -640,8 +654,8 @@ export function setupSolarSystem(
       // Mark this as a moon for InfoPanel
       (moonPayload as any).isMoon = true;
       (moonPayload as any).parentId = parent?.id;
-      // focus on parent planet first for context
-      if (parent) focusCameraOnPlanet(parent);
+      // Focus on the moon itself using a custom function
+      focusCameraOnMoon(moonMeshes[moonKey], moonPayload);
       onPlanetClick(moonPayload);
       return;
     }
@@ -654,6 +668,25 @@ export function setupSolarSystem(
     const worldPos = new THREE.Vector3();
     mesh.getWorldPosition(worldPos);
     const targetPos = worldPos.clone().add(new THREE.Vector3(planet.radius * 6, planet.radius * 3, planet.radius * 6));
+    const startPos = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const duration = 900;
+    const t0 = Date.now();
+    function step() {
+      const t = Math.min(1, (Date.now() - t0) / duration);
+      camera.position.lerpVectors(startPos, targetPos, t);
+      controls.target.lerpVectors(startTarget, worldPos, t);
+      controls.update();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    step();
+  }
+
+  // Focus helper for moons
+  function focusCameraOnMoon(moonMesh: THREE.Mesh, moonData: PlanetData) {
+    const worldPos = new THREE.Vector3();
+    moonMesh.getWorldPosition(worldPos);
+    const targetPos = worldPos.clone().add(new THREE.Vector3(moonData.radius * 8, moonData.radius * 4, moonData.radius * 8));
     const startPos = camera.position.clone();
     const startTarget = controls.target.clone();
     const duration = 900;
@@ -700,12 +733,49 @@ export function setupSolarSystem(
 
   function stopFollowPlanet() {
     followPlanetId = null;
+    followMoonKey = null;
+    pausedMoonKey = null;
     followEnabled = false;
     followLockToSurface = false;
     // restore controls
     if (savedControls.minDistance !== undefined) controls.minDistance = savedControls.minDistance;
     if (savedControls.maxDistance !== undefined) controls.maxDistance = savedControls.maxDistance;
     if (savedControls.enablePan !== undefined) (controls as any).enablePan = savedControls.enablePan;
+  }
+
+  // Pause moon orbital movement (keep self-rotation)
+  function pauseMoonOrbit(moonKey: string) {
+    pausedMoonKey = moonKey;
+  }
+
+  // Resume moon orbital movement
+  function resumeMoonOrbit() {
+    pausedMoonKey = null;
+  }
+
+  // Attach camera to a moon so it moves with the moon
+  function followMoon(moonKey: string, height: number = 2, lockToSurface: boolean = false) {
+    const mm = moonMeshes[moonKey];
+    if (!mm) return;
+    followMoonKey = moonKey;
+    followEnabled = true;
+    followLockToSurface = !!lockToSurface;
+    followHeight = height;
+    mm.getWorldPosition(followPrevPos);
+
+    // place camera above the moon surface
+    const desiredPos = followPrevPos.clone().add(new THREE.Vector3(0, height, 0));
+    camera.position.copy(desiredPos);
+    controls.target.copy(followPrevPos);
+    // save controls state and restrict panning if requested
+    savedControls.minDistance = controls.minDistance;
+    savedControls.maxDistance = controls.maxDistance;
+    savedControls.enablePan = (controls as any).enablePan;
+    if (followLockToSurface) {
+      controls.minDistance = 0.1;
+      controls.maxDistance = Math.max(5, height * 4);
+      (controls as any).enablePan = false;
+    }
   }
 
   function resetCamera() {
@@ -763,6 +833,12 @@ export function setupSolarSystem(
       const mg = moonGroups[pid];
       if (mg) {
         mg.children.forEach((m: any) => {
+          // Skip orbital movement if this moon is paused
+          if (pausedMoonKey && pausedMoonKey === `${pid}:${m.userData.name}`) {
+            // Only rotate the moon mesh (self-rotation), no orbital movement
+            m.rotation.y += 0.01 * simulationSpeed;
+            return;
+          }
           m.userData.angle += (m.userData.orbitSpeed ?? 0) * simulationSpeed;
           m.position.x = Math.cos(m.userData.angle) * m.userData.orbitRadius;
           m.position.z = Math.sin(m.userData.angle) * m.userData.orbitRadius;
@@ -811,6 +887,20 @@ export function setupSolarSystem(
       if (pm) {
         const curr = new THREE.Vector3();
         pm.getWorldPosition(curr);
+        const delta = curr.clone().sub(followPrevPos);
+        if (delta.lengthSq() > 0) {
+          camera.position.add(delta);
+          controls.target.add(delta);
+        }
+        followPrevPos.copy(curr);
+      }
+    }
+    // If following a moon, translate camera/controls by moon movement delta so camera moves with moon
+    if (followEnabled && followMoonKey) {
+      const mm = moonMeshes[followMoonKey];
+      if (mm) {
+        const curr = new THREE.Vector3();
+        mm.getWorldPosition(curr);
         const delta = curr.clone().sub(followPrevPos);
         if (delta.lengthSq() > 0) {
           camera.position.add(delta);
@@ -899,7 +989,10 @@ export function setupSolarSystem(
     zoomOut,
     getCameraDistance,
     followPlanet,
+    followMoon,
     stopFollowPlanet,
+    pauseMoonOrbit,
+    resumeMoonOrbit,
     getFollowingPlanetId: () => followPlanetId,
     resetCamera,
     isGalaxyVisible: () => false
