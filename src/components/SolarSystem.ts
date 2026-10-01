@@ -980,6 +980,37 @@ export function setupSolarSystem(
       const p = planetData.find(p => p.id === planetId);
       if (p) focusCameraOnPlanet(p);
     },
+    selectMoon: (planetId: string, moonName: string) => {
+      const moonKey = `${planetId}:${moonName}`;
+      const moonMesh = moonMeshes[moonKey];
+      if (!moonMesh) return;
+      
+      const md = moonMesh.userData;
+      const parent = planetData.find(p => p.id === md.parentId);
+      const visualRadius = (moonMesh.geometry as THREE.SphereGeometry).parameters.radius;
+      
+      const moonPayload: PlanetData = {
+        id: `${md.parentId}-${md.name}`,
+        name: md.name,
+        radius: visualRadius,
+        distanceFromSun: parent ? parent.distanceFromSun : 0,
+        orbitSpeed: md.orbitSpeed ?? 0,
+        texture: 'moon.jpg',
+        description: `Moon of ${parent ? parent.name : md.parentId}.`,
+        diameter: md.realRadiusKm ? Math.round(md.realRadiusKm * 2) : Math.round(visualRadius * 1000),
+        mass: '—',
+        dayLength: '—',
+        yearLength: '—',
+        avgTemp: '—',
+        funFact: `Click Learn More to search NASA.`,
+        moons: []
+      };
+      (moonPayload as any).isMoon = true;
+      (moonPayload as any).parentId = parent?.id;
+      
+      focusCameraOnMoon(moonMesh, moonPayload);
+      onPlanetClick(moonPayload);
+    },
     updateSimulationSpeed,
     cleanupScene,
     setMoonsVisible,
