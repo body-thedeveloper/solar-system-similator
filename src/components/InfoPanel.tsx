@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Volume2, VolumeX } from 'lucide-react';
 import { PlanetData } from '../data/planetData';
 import { useLanguage } from '../context/LanguageContext';
 import { getPlanetTranslationKeys } from '../i18n/translations';
@@ -46,8 +46,178 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(false);
+  const [isNarrating, setIsNarrating] = useState(false);
   
   const parentId = (planet as any).parentId;
+
+  // Cosmic sound synthesizer
+  const playSpaceChime = (type: 'beep' | 'swoosh' | 'chime') => {
+    if (!('AudioContext' in window || 'webkitAudioContext' in window)) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      
+      if (type === 'chime') {
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(880, now); 
+        osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.15); 
+        
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(1320, now); 
+        
+        gainNode.gain.setValueAtTime(0.12, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+        
+        osc1.connect(gainNode);
+        osc2.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.8);
+        osc2.stop(now + 0.8);
+      } else if (type === 'swoosh') {
+        const osc = ctx.createOscillator();
+        const filter = ctx.createBiquadFilter();
+        const gainNode = ctx.createGain();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(400, now + 0.5);
+        
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(300, now);
+        filter.frequency.exponentialRampToValueAtTime(1500, now + 0.4);
+        filter.Q.setValueAtTime(5, now);
+        
+        gainNode.gain.setValueAtTime(0.06, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        
+        osc.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc.start(now);
+        osc.stop(now + 0.6);
+      } else if (type === 'beep') {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1000, now);
+        
+        gainNode.gain.setValueAtTime(0.04, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc.start(now);
+        osc.stop(now + 0.15);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Text-To-Speech Narrator with multi-language capability
+  const handleNarrateToggle = () => {
+    if (!('speechSynthesis' in window)) {
+      alert(language === 'ar' ? 'متصفحك لا يدعم توليد الصوت.' : 'Text-to-speech is not supported in your browser.');
+      return;
+    }
+
+    if (isNarrating) {
+      window.speechSynthesis.cancel();
+      setIsNarrating(false);
+      playSpaceChime('beep');
+      return;
+    }
+
+    playSpaceChime('chime');
+
+    // Build speech text
+    const pName = isMoon ? displayName : (t(planet.id as any) || planet.name);
+    const factsLabel = language === 'ar' ? 'معلومات سريعة' : 'Quick Facts';
+    const diameterLabel = t('diameter');
+    const dVal = `${planet.diameter.toLocaleString()} ${t('km')}`;
+    const funFactLabel = t('funFact');
+    
+    let textToSpeak = `${pName}. ${displayDescription}. ${factsLabel}: ${diameterLabel} ${dVal}. ${funFactLabel}: ${displayFunFact}.`;
+
+    // Strip out some special symbols/exponents that might sound weird in speech
+    textToSpeak = textToSpeak.replace(/×/g, language === 'ar' ? 'مضروبة في' : 'times');
+    textToSpeak = textToSpeak.replace(/\^/g, language === 'ar' ? 'أس' : 'power of');
+
+    // Split text into sentences for robust browser TTS rendering
+    const sentences = textToSpeak.match(/[^.!?،؟]+[.!?،؟]*/g) || [textToSpeak];
+    let currentIndex = 0;
+
+    const speakNext = () => {
+      if (currentIndex >= sentences.length) {
+        setIsNarrating(false);
+        return;
+      }
+
+      const sentence = sentences[currentIndex].trim();
+      if (!sentence) {
+        currentIndex++;
+        speakNext();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      utterance.lang = language === 'ar' ? 'ar-SA' : 'en-US';
+
+      // Find appropriate regional voices
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => 
+        language === 'ar' ? v.lang.startsWith('ar') : v.lang.startsWith('en')
+      );
+      if (voice) {
+        utterance.voice = voice;
+      }
+
+      utterance.rate = language === 'ar' ? 0.95 : 1.05;
+      utterance.pitch = 1.0;
+
+      utterance.onend = () => {
+        currentIndex++;
+        speakNext();
+      };
+
+      utterance.onerror = (e) => {
+        // Interrupted or canceled
+        setIsNarrating(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    };
+
+    setIsNarrating(true);
+    speakNext();
+  };
+
+  // Stop narration on unmount or when selected planet changes
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsNarrating(false);
+  }, [planet]);
+
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
   const isMoon = (planet as any).isMoon || parentId;
   
   // For moons, translate the moon name based on current language
@@ -138,10 +308,55 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         </button>
         
         <div className="p-5">
-          <div className="flex items-center mb-1">
-            <h2 className="text-2xl font-bold">{isMoon ? displayName : (t(planet.id as any) || planet.name)}{parentLabel}</h2>
+          <div className="flex items-center justify-between mb-1 gap-2">
+            <h2 className="text-2xl font-bold pr-6">{isMoon ? displayName : (t(planet.id as any) || planet.name)}{parentLabel}</h2>
+            {/* Narrator Button */}
+            <button
+              onClick={handleNarrateToggle}
+              className={`p-2 rounded-full transition-all duration-300 flex items-center justify-center relative ${
+                isNarrating
+                  ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 scale-110 shadow-lg shadow-cyan-500/25 pulse-glow'
+                  : 'bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10 hover:scale-105'
+              }`}
+              title={isNarrating ? (language === 'ar' ? 'إيقاف السرد' : 'Stop Narrator') : (language === 'ar' ? 'تشغيل السرد الصوتي' : 'Play Narrator')}
+            >
+              {isNarrating ? (
+                <div className="flex items-center gap-1.5 px-1">
+                  {/* CSS Audio Waveform */}
+                  <div className="flex items-end gap-0.5 h-4 w-5">
+                    <span className="w-0.5 bg-cyan-300 rounded-full animate-wave-1 origin-bottom h-full" />
+                    <span className="w-0.5 bg-cyan-300 rounded-full animate-wave-2 origin-bottom h-3/4" />
+                    <span className="w-0.5 bg-cyan-300 rounded-full animate-wave-3 origin-bottom h-full" />
+                    <span className="w-0.5 bg-cyan-300 rounded-full animate-wave-4 origin-bottom h-1/2" />
+                  </div>
+                  <Volume2 size={16} className="text-cyan-300" />
+                </div>
+              ) : (
+                <VolumeX size={18} />
+              )}
+            </button>
           </div>
           <div className="w-full h-0.5 bg-white/20 mb-4"></div>
+
+          {/* Add CSS keyframes dynamically for waveform bounce */}
+          <style>{`
+            @keyframes bounce-wave {
+              0%, 100% { transform: scaleY(0.3); }
+              50% { transform: scaleY(1); }
+            }
+            .animate-wave-1 { animation: bounce-wave 0.6s ease-in-out infinite; }
+            .animate-wave-2 { animation: bounce-wave 0.5s ease-in-out infinite 0.15s; }
+            .animate-wave-3 { animation: bounce-wave 0.7s ease-in-out infinite 0.3s; }
+            .animate-wave-4 { animation: bounce-wave 0.4s ease-in-out infinite 0.45s; }
+            
+            @keyframes pulse-glow {
+              0%, 100% { box-shadow: 0 0 5px rgba(6, 182, 212, 0.2); }
+              50% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.6); }
+            }
+            .pulse-glow {
+              animation: pulse-glow 2s infinite;
+            }
+          `}</style>
           
           {showComparison && (
             <div className="flex gap-2 mb-4">
@@ -200,9 +415,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
                 <h3 className="text-gray-400 mb-1">{t('moons')} ({planet.moons.length})</h3>
                 <div className={`flex flex-wrap gap-1 ${language === 'ar' ? 'justify-end' : 'justify-start'}`}>
                   {planet.moons.slice(0, 5).map((moon, index) => (
-                    <span key={index} className="bg-white/10 px-2 py-1 rounded-full text-xs">
+                    <button
+                      key={index}
+                      onClick={() => solarApi?.selectMoon?.(planet.id, moon.name)}
+                      className="bg-white/10 hover:bg-white/25 active:bg-white/35 px-2 py-1 rounded-full text-xs transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer text-white border border-white/5 hover:border-white/20"
+                    >
                       {language === 'ar' ? (t(moon.name.toLowerCase().replace(/\s+/g, '') as any) || moon.name) : moon.name}
-                    </span>
+                    </button>
                   ))}
                   {planet.moons.length > 5 && (
                     <span className="bg-white/10 px-2 py-1 rounded-full text-xs">

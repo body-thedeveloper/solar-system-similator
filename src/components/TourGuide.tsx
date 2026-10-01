@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { planetData, PlanetData } from '../data/planetData';
 import { tourContent } from '../data/tourContent';
 import { useLanguage } from '../context/LanguageContext';
@@ -43,6 +44,112 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
   const [planetIndex, setPlanetIndex] = useState(0);
   const [sectionIndex, setSectionIndex] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [isNarrating, setIsNarrating] = useState(false);
+
+  // Speak function for the Tour Guide
+  const speakTourStep = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel(); // Stop any active speech
+
+    // Remove emojis and special characters for natural voice narration
+    let cleanText = text.replace(/🔴|🟡|🌍|🟠|🪐|🔵|✨|💥/g, '');
+    cleanText = cleanText.replace(/Booooooom!!/gi, '');
+    cleanText = cleanText.replace(/بوووووم!!/g, '');
+
+    const sentences = cleanText.match(/[^.!?،؟]+[.!?،؟]*/g) || [cleanText];
+    let currentIndex = 0;
+
+    const speakNext = () => {
+      if (currentIndex >= sentences.length) {
+        return;
+      }
+
+      const sentence = sentences[currentIndex].trim();
+      if (!sentence) {
+        currentIndex++;
+        speakNext();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      utterance.lang = language === 'ar' ? 'ar-SA' : 'en-US';
+
+      // Find regional voices
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => 
+        language === 'ar' ? v.lang.startsWith('ar') : v.lang.startsWith('en')
+      );
+      if (voice) {
+        utterance.voice = voice;
+      }
+
+      utterance.rate = language === 'ar' ? 0.95 : 1.05;
+      utterance.pitch = 1.08; // Slightly higher cinematic guide pitch
+
+      utterance.onend = () => {
+        currentIndex++;
+        speakNext();
+      };
+
+      utterance.onerror = () => {
+        // Safe fallback on interrupt
+      };
+
+      window.speechSynthesis.speak(utterance);
+    };
+
+    speakNext();
+  };
+
+  // Trigger speech when step changes
+  useEffect(() => {
+    if (isNarrating && isOpen) {
+      const p = planets[planetIndex];
+      const content = tourContent[p.id] || tourContent.mercury;
+      let text = '';
+      const isArabic = language === 'ar';
+      
+      if (sectionIndex === 0) {
+        text = isArabic ? content.prologue.ar : content.prologue.en;
+      } else if (sectionIndex === 1) {
+        text = isArabic 
+          ? `${content.story.ar}. ${content.massExplanation.ar}` 
+          : `${content.story.en}. ${content.massExplanation.en}`;
+      } else if (sectionIndex === 2) {
+        const funFactKey = `${p.id}FunFact` as any;
+        const translatedFunFact = t(funFactKey) || p.funFact;
+        text = isArabic ? `هل تعلم؟ حقيقة مذهلة: ${translatedFunFact}` : `Did you know? Amazing Fact: ${translatedFunFact}`;
+      }
+
+      speakTourStep(text);
+    } else {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+  }, [planetIndex, sectionIndex, isNarrating, isOpen, language]);
+
+  // Stop narration on unmount or close
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsNarrating(false);
+    }
+  }, [isOpen]);
+
+  const handleNarrateToggle = () => {
+    setIsNarrating(prev => !prev);
+  };
   const [showQuizSelection, setShowQuizSelection] = useState(false);
   const [selectedQuizStage, setSelectedQuizStage] = useState<QuizStage | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
@@ -333,11 +440,55 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
   return (
     <div className="absolute left-5 top-16 w-96 liquid-glass liquid-glass-glow text-white p-4 rounded-2xl z-40">
       <div className="flex items-center justify-between mb-3">
-        <div className="font-bold text-lg">{t('tourGuide') || 'Tour Guide'}</div>
+        <div className="font-bold text-lg flex items-center gap-2">
+          <span>{t('tourGuide') || 'Tour Guide'}</span>
+          {/* Tour Guide Narrator */}
+          <button
+            onClick={handleNarrateToggle}
+            className={`p-1.5 rounded-full transition-all duration-300 flex items-center justify-center relative ${
+              isNarrating
+                ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 scale-105 shadow-md shadow-cyan-500/20 pulse-glow'
+                : 'bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white border border-white/10'
+            }`}
+            title={isNarrating ? (language === 'ar' ? 'إيقاف السرد' : 'Stop Narration') : (language === 'ar' ? 'تشغيل السرد الصوتي' : 'Play Narration')}
+          >
+            {isNarrating ? (
+              <div className="flex items-center gap-1 px-0.5">
+                <div className="flex items-end gap-0.5 h-3 w-4">
+                  <span className="w-0.5 bg-cyan-300 rounded-full animate-wave-1 origin-bottom h-full" />
+                  <span className="w-0.5 bg-cyan-300 rounded-full animate-wave-2 origin-bottom h-3/4" />
+                  <span className="w-0.5 bg-cyan-300 rounded-full animate-wave-3 origin-bottom h-full" />
+                </div>
+                <Volume2 size={12} className="text-cyan-300" />
+              </div>
+            ) : (
+              <VolumeX size={14} />
+            )}
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <button onClick={handleSkip} className="text-sm px-3 py-1 liquid-glass-button">{t('skip') || 'Skip'}</button>
         </div>
       </div>
+
+      {/* Add Waveform CSS animation block if not already defined */}
+      <style>{`
+        @keyframes bounce-wave-tour {
+          0%, 100% { transform: scaleY(0.3); }
+          50% { transform: scaleY(1); }
+        }
+        .animate-wave-1 { animation: bounce-wave-tour 0.6s ease-in-out infinite; }
+        .animate-wave-2 { animation: bounce-wave-tour 0.5s ease-in-out infinite 0.15s; }
+        .animate-wave-3 { animation: bounce-wave-tour 0.7s ease-in-out infinite 0.3s; }
+        
+        @keyframes pulse-glow-tour {
+          0%, 100% { box-shadow: 0 0 5px rgba(6, 182, 212, 0.2); }
+          50% { box-shadow: 0 0 10px rgba(6, 182, 212, 0.5); }
+        }
+        .pulse-glow {
+          animation: pulse-glow-tour 2s infinite;
+        }
+      `}</style>
 
       <div className="mb-4">
         <div className="text-sm text-gray-400 mb-1" dir={isArabic ? 'rtl' : 'ltr'}>{(t(planet.id as any) || planet.name)}</div>

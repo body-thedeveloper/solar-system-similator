@@ -32,34 +32,44 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
           </div>
         </div>
         
-        <h1 className="text-4xl font-bold text-center text-white mb-3">
-          {t('selectLanguage')}
+        <h1 className="text-3xl font-bold text-center text-white mb-3 flex flex-col items-center gap-1">
+          <span className="text-2xl md:text-3xl">Select Language</span>
+          <span className="text-xl md:text-2xl text-cyan-400 font-arabic">اختر لغة</span>
         </h1>
-        <p className="text-center text-gray-300 mb-10 text-lg">
-          {t('chooseLanguage')}
-        </p>
+        <div className="text-center text-gray-300 mb-8 flex flex-col gap-1 text-sm md:text-base">
+          <span>Please choose your preferred language</span>
+          <span className="text-cyan-300/80 font-arabic">يرجى اختيار لغتك المفضلة</span>
+        </div>
 
         <div className="flex flex-col gap-4 mb-8">
           <button
             onClick={() => handleLanguageClick('en')}
-            className={`w-full transition-all duration-200 transform active:scale-110 text-lg rounded-xl font-bold py-4 px-6 liquid-glass-button shiny-border-hover ${
+            className={`w-full transition-all duration-200 transform active:scale-110 rounded-xl font-bold py-4 px-6 liquid-glass-button shiny-border-hover flex items-center justify-between ${
               selectedLang === 'en' 
-                ? 'scale-110 !bg-gradient-to-r from-blue-600 to-blue-700 text-white' 
+                ? 'scale-110 !bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/35 border border-blue-400' 
                 : 'text-white hover:scale-105'
             }`}
           >
-            <span className="text-2xl mr-3">🇺🇸</span> {t('english')}
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🇺🇸</span>
+              <span className="text-lg">English</span>
+            </div>
+            <span className="text-sm text-gray-300">الإنجليزية</span>
           </button>
           
           <button
             onClick={() => handleLanguageClick('ar')}
-            className={`w-full transition-all duration-200 transform active:scale-110 text-lg rounded-xl font-bold py-4 px-6 liquid-glass-button shiny-border-hover ${
+            className={`w-full transition-all duration-200 transform active:scale-110 rounded-xl font-bold py-4 px-6 liquid-glass-button shiny-border-hover flex items-center justify-between ${
               selectedLang === 'ar' 
-                ? 'scale-110 !bg-gradient-to-r from-green-600 to-green-700 text-white' 
+                ? 'scale-110 !bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/35 border border-green-400' 
                 : 'text-white hover:scale-105'
             }`}
           >
-            <span className="text-2xl mr-3">🇸🇦</span> {t('arabic')}
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🇸🇦</span>
+              <span className="text-lg font-arabic">عربي</span>
+            </div>
+            <span className="text-sm text-gray-300">Arabic</span>
           </button>
         </div>
 
@@ -68,11 +78,15 @@ const LanguageModal: React.FC<LanguageModalProps> = ({ isOpen, onLanguageSelect 
           disabled={!selectedLang}
           className={`w-full py-3 px-6 font-bold rounded-xl transition-all duration-200 text-base liquid-glass-button shiny-border-hover ${
             selectedLang 
-              ? 'text-white cursor-pointer' 
-              : 'opacity-60 cursor-not-allowed'
+              ? 'text-white cursor-pointer hover:scale-105 shadow-md shadow-cyan-500/20' 
+              : 'opacity-40 cursor-not-allowed text-gray-400'
           }`}
         >
-          {t('ok')}
+          <span className="flex items-center justify-center gap-2">
+            <span>OK</span>
+            <span className="text-gray-400">/</span>
+            <span className="font-arabic">حسنا</span>
+          </span>
         </button>
       </div>
 

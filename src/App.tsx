@@ -9,6 +9,7 @@ import TourGuide from './components/TourGuide';
 import QuizStageSelection from './components/QuizStageSelection';
 import Quiz from './components/Quiz';
 import QuizResults from './components/QuizResults';
+import CosmicRadio from './components/CosmicRadio';
 import { PlanetData } from './data/planetData';
 import { QuizStage } from './data/quizData';
 import { Sun, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
@@ -251,6 +252,11 @@ function App() {
         ref={canvasRef} 
         className="absolute inset-0 z-0 bg-black" 
       />
+
+      {/* Cosmic Music Radio Synthesizer (opposite side of InfoPanel) */}
+      <div className={`absolute bottom-5 ${language === 'ar' ? 'right-5' : 'left-5'} z-10 hidden md:block`}>
+        <CosmicRadio />
+      </div>
 
       {/* UI Controls */}
       <div className="absolute bottom-5 left-0 right-0 z-10 flex justify-center">

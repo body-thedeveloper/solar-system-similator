@@ -22,7 +22,7 @@ export function setupSolarSystem(
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
 
   // Camera & controls
@@ -235,6 +235,66 @@ export function setupSolarSystem(
   // Call starfield instead of procedural stars
   addStarfieldBackground();
 
+  // Add magical floating cosmic dust particles
+  let cosmicDust: THREE.Points | null = null;
+  function addCosmicDust() {
+    const particleCount = 1500;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount * 3; i += 3) {
+      const radius = 60 + Math.random() * 450;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos((Math.random() * 2) - 1);
+
+      positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+      positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      positions[i + 2] = radius * Math.cos(phi);
+
+      const rand = Math.random();
+      if (rand < 0.4) {
+        // Soft Cyan Nebula
+        colors[i] = 0.2; colors[i + 1] = 0.8; colors[i + 2] = 1.0;
+      } else if (rand < 0.7) {
+        // Deep Space Purple
+        colors[i] = 0.6; colors[i + 1] = 0.2; colors[i + 2] = 0.9;
+      } else {
+        // Celestial Gold Dust
+        colors[i] = 1.0; colors[i + 1] = 0.85; colors[i + 2] = 0.4;
+      }
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d')!;
+    const grad = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 16, 16);
+    const dustTex = new THREE.CanvasTexture(canvas);
+
+    const material = new THREE.PointsMaterial({
+      size: 1.6,
+      map: dustTex,
+      transparent: true,
+      opacity: 0.6,
+      vertexColors: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const dustPoints = new THREE.Points(geometry, material);
+    scene.add(dustPoints);
+    return dustPoints;
+  }
+  cosmicDust = addCosmicDust();
+
   // Sun mesh with label
   const sun = new THREE.Mesh(new THREE.SphereGeometry(8.5, 32, 32), new THREE.MeshBasicMaterial({ map: sunTexture }));
   sun.name = 'sun';
@@ -280,7 +340,6 @@ export function setupSolarSystem(
     // Planet mesh
     const planetGeo = new THREE.SphereGeometry(planet.radius, 32, 32);
     const planetMat = new THREE.MeshBasicMaterial({ toneMapped: false });
-    planetMat.emissiveIntensity = 0.1;
     loader.load(`${import.meta.env.BASE_URL}images/${planet.texture}`, (t) => { planetMat.map = t; planetMat.needsUpdate = true; });
     const planetMesh = new THREE.Mesh(planetGeo, planetMat);
     planetMesh.castShadow = true;
@@ -329,7 +388,6 @@ export function setupSolarSystem(
         polygonOffset: true,
         polygonOffsetFactor: -1
       });
-      ringMaterial.emissiveIntensity = 0.3;
 
       const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
       ringMesh.castShadow = true;
@@ -375,7 +433,6 @@ export function setupSolarSystem(
 
         const moonGeo = new THREE.SphereGeometry(visualMoonRadius, 16, 16);
         const moonMat = new THREE.MeshBasicMaterial({ map: moonTexture });
-        moonMat.emissiveIntensity = 0.3;
         const moonMesh = new THREE.Mesh(moonGeo, moonMat);
         moonMesh.castShadow = true;
         moonMesh.receiveShadow = true;
@@ -818,6 +875,13 @@ export function setupSolarSystem(
   // Animation loop
   function animate() {
     requestAnimationFrame(animate);
+
+    // Slowly rotate stardust nebula
+    if (cosmicDust) {
+      cosmicDust.rotation.y += 0.00012 * (simulationSpeed + 0.15);
+      cosmicDust.rotation.x += 0.00006 * (simulationSpeed + 0.15);
+    }
+
     // Update planets
     planets.forEach((pg) => {
       const speed = (pg.userData.orbitSpeed ?? 0) * simulationSpeed;

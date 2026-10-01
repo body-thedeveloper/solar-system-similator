@@ -16,7 +16,6 @@ export const translations = {
     stopTour: 'Stop Tour',
     overview: 'Overview',
     quickFacts: 'Quick Facts',
-    circumference: 'Circumference',
 
     // Loading Screen
     selectLanguage: 'Select Language',
@@ -197,7 +196,6 @@ export const translations = {
     stopTour: 'وقف الجولة',
     overview: 'نظرة عامة',
     quickFacts: 'حقائق سريعة',
-    circumference: 'المحيط',
 
     // Loading Screen
     selectLanguage: 'اختر اللغة',
