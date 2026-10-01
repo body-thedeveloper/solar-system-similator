@@ -4,7 +4,7 @@ export const translations = {
     ok: 'OK',
     close: 'Close',
     english: 'English',
-    arabic: 'عربي',
+    arabic: 'Arabic',
     radius: 'Radius',
     millionKm: 'million km',
     circumference: 'Circumference',
@@ -183,7 +183,7 @@ export const translations = {
     // Common
     ok: 'موافق',
     close: 'إغلاق',
-    english: 'English',
+    english: 'الإنجليزية',
     arabic: 'عربي',
     radius: 'نصف القطر',
     millionKm: 'مليون كم',

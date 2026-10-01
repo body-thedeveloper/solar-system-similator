@@ -7,6 +7,7 @@ import QuizStageSelection from './QuizStageSelection';
 import Quiz from './Quiz';
 import QuizResults from './QuizResults';
 import { QuizStage } from '../data/quizData';
+import { speakText, stopSpeech } from '../utils/speech';
 
 interface TourGuideProps {
   solarApi: any;
@@ -46,59 +47,10 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
   const [showCompletion, setShowCompletion] = useState(false);
   const [isNarrating, setIsNarrating] = useState(false);
 
-  // Speak function for the Tour Guide
+  // Speak function for the Tour Guide - delegates to the shared speech engine
+  // (cloud neural voice for Arabic with تشكيل, best local voice as fallback).
   const speakTourStep = (text: string) => {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel(); // Stop any active speech
-
-    // Remove emojis and special characters for natural voice narration
-    let cleanText = text.replace(/🔴|🟡|🌍|🟠|🪐|🔵|✨|💥/g, '');
-    cleanText = cleanText.replace(/Booooooom!!/gi, '');
-    cleanText = cleanText.replace(/بوووووم!!/g, '');
-
-    const sentences = cleanText.match(/[^.!?،؟]+[.!?،؟]*/g) || [cleanText];
-    let currentIndex = 0;
-
-    const speakNext = () => {
-      if (currentIndex >= sentences.length) {
-        return;
-      }
-
-      const sentence = sentences[currentIndex].trim();
-      if (!sentence) {
-        currentIndex++;
-        speakNext();
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(sentence);
-      utterance.lang = language === 'ar' ? 'ar-SA' : 'en-US';
-
-      // Find regional voices
-      const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find(v => 
-        language === 'ar' ? v.lang.startsWith('ar') : v.lang.startsWith('en')
-      );
-      if (voice) {
-        utterance.voice = voice;
-      }
-
-      utterance.rate = language === 'ar' ? 0.95 : 1.05;
-      utterance.pitch = 1.08; // Slightly higher cinematic guide pitch
-
-      utterance.onend = () => {
-        currentIndex++;
-        speakNext();
-      };
-
-      utterance.onerror = () => {
-        // Safe fallback on interrupt
-      };
-
-      window.speechSynthesis.speak(utterance);
-    };
-
-    speakNext();
+    speakText(text, { lang: language === 'ar' ? 'ar' : 'en' });
   };
 
   // Trigger speech when step changes
@@ -123,26 +75,20 @@ const TourGuide: React.FC<TourGuideProps> = ({ solarApi, isOpen = false, onClose
 
       speakTourStep(text);
     } else {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeech();
     }
   }, [planetIndex, sectionIndex, isNarrating, isOpen, language]);
 
   // Stop narration on unmount or close
   useEffect(() => {
     return () => {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeech();
     };
   }, []);
 
   useEffect(() => {
     if (!isOpen) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeech();
       setIsNarrating(false);
     }
   }, [isOpen]);

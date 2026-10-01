@@ -12,7 +12,7 @@ import QuizResults from './components/QuizResults';
 import CosmicRadio from './components/CosmicRadio';
 import { PlanetData } from './data/planetData';
 import { QuizStage } from './data/quizData';
-import { Sun, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
+import { Sun, ZoomIn, ZoomOut, Crosshair, Sparkles } from 'lucide-react';
 import { useLanguage } from './context/LanguageContext';
 
 function App() {
@@ -240,8 +240,12 @@ function App() {
           <div className="flex flex-col items-center gap-6">
             <Sun className="w-20 h-20 animate-spin text-yellow-400" />
             <div className="text-center">
-              <h1 className="text-3xl font-bold text-white mb-2">Loading Solar System...</h1>
-              <p className="text-gray-300">Initializing the universe...</p>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                {language === 'ar' ? 'جارٍ تحميل النظام الشمسي...' : 'Loading Solar System...'}
+              </h1>
+              <p className="text-gray-300">
+                {language === 'ar' ? 'جارٍ تهيئة الكون...' : 'Initializing the universe...'}
+              </p>
             </div>
           </div>
         </div>
@@ -254,13 +258,13 @@ function App() {
       />
 
       {/* Cosmic Music Radio Synthesizer (opposite side of InfoPanel) */}
-      <div className={`absolute bottom-5 ${language === 'ar' ? 'right-5' : 'left-5'} z-10 hidden md:block`}>
+      <div className={`absolute bottom-28 ${language === 'ar' ? 'right-5' : 'left-5'} z-30`}>
         <CosmicRadio />
       </div>
 
       {/* UI Controls */}
-      <div className="absolute bottom-5 left-0 right-0 z-10 flex justify-center">
-        <div className="flex items-center gap-2">
+      <div className="absolute bottom-5 left-0 right-0 z-10 flex justify-center pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-auto">
           {/* Zoom Out Button */}
           <button
             className="p-2 rounded-full liquid-glass-button transition-colors"
@@ -291,6 +295,19 @@ function App() {
             type="button"
           >
             <ZoomIn size={20} />
+          </button>
+          {/* Re-center Camera Button - returns camera to the default view/direction */}
+          <button
+            className="px-3 py-2 rounded-full liquid-glass-button transition-colors flex items-center gap-1.5"
+            aria-label={language === 'ar' ? 'إعادة توسيط الكاميرا' : 'Re-center Camera'}
+            title={language === 'ar' ? 'إعادة توسيط الكاميرا' : 'Re-center Camera'}
+            onClick={() => solarApi?.resetCameraView?.()}
+            type="button"
+          >
+            <Crosshair size={20} />
+            <span className="text-xs font-semibold whitespace-nowrap">
+              {language === 'ar' ? 'إعادة التوسيط' : 'Re-center'}
+            </span>
           </button>
         </div>
       </div>

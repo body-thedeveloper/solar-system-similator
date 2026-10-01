@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Music, Volume2, VolumeX, Sparkles, Disc, Radio } from 'lucide-react';
+import { Music, Volume2, VolumeX, Sparkles, Disc, Radio, Square } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 const CosmicRadio: React.FC = () => {
@@ -210,6 +210,16 @@ const CosmicRadio: React.FC = () => {
     }
   };
 
+  // Clicking the collapsed COSMIC DJ pill expands the widget AND starts the music
+  // (if it isn't already playing), so the button always does something visible.
+  const handlePillClick = () => {
+    handleMouseEnter();
+    if (!isPlaying) {
+      initAudio();
+      setIsPlaying(true);
+    }
+  };
+
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     setVolume(val);
@@ -272,10 +282,9 @@ const CosmicRadio: React.FC = () => {
     return (
       <button
         onMouseEnter={handleMouseEnter}
-        onClick={handleMouseEnter}
-        className={`liquid-glass text-white p-3 rounded-full flex items-center gap-2.5 shadow-lg border border-cyan-500/30 cursor-pointer animate-pulse-glow transition-all duration-300 hover:scale-110 active:scale-95 ${
-          language === 'ar' ? 'rtl' : 'ltr'
-        }`}
+        onClick={handlePillClick}
+        dir={language === 'ar' ? 'rtl' : 'ltr'}
+        className="liquid-glass text-white p-3 rounded-full flex items-center gap-2.5 shadow-lg border border-cyan-500/30 cursor-pointer animate-pulse-glow transition-all duration-300 hover:scale-110 active:scale-95"
       >
         <div className="relative flex items-center justify-center">
           <Disc className={`w-5 h-5 text-cyan-400 ${isPlaying ? 'animate-spin-slow' : ''}`} />
@@ -286,8 +295,15 @@ const CosmicRadio: React.FC = () => {
             </span>
           )}
         </div>
-        <span className="text-xs font-bold tracking-wider whitespace-nowrap pr-1 select-none">
+        <span className="text-xs font-bold whitespace-nowrap px-1 select-none">
           {language === 'ar' ? 'الراديو الكوني' : 'COSMIC DJ'}
+        </span>
+        <span
+          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full select-none ${
+            isPlaying ? 'bg-cyan-500/30 text-cyan-300' : 'bg-white/10 text-gray-400'
+          }`}
+        >
+          {isPlaying ? (language === 'ar' ? 'يعمل' : 'ON') : (language === 'ar' ? 'متوقف' : 'OFF')}
         </span>
 
         <style>{`
@@ -315,38 +331,41 @@ const CosmicRadio: React.FC = () => {
     <div
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`liquid-glass text-white p-4 rounded-2xl flex flex-col gap-3 min-w-[240px] shadow-2xl border border-cyan-500/40 animate-scaleIn transition-all duration-300 ${language === 'ar' ? 'rtl' : 'ltr'}`}
+      dir={language === 'ar' ? 'rtl' : 'ltr'}
+      className="liquid-glass text-white p-4 rounded-2xl flex flex-col gap-3 w-[320px] shadow-2xl border border-cyan-500/40 animate-scaleIn transition-all duration-300"
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Radio className={`w-5 h-5 text-cyan-400 ${isPlaying ? 'animate-pulse' : ''}`} />
-          <h3 className="font-bold text-sm tracking-wider flex flex-col">
-            <span>COSMIC RADIO DJ</span>
-            <span className="text-[10px] text-cyan-300 font-arabic">الراديو الكوني الموسيقي</span>
+      {/* Header: title + play/stop - each side can shrink so nothing overlaps */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Radio className={`w-5 h-5 shrink-0 text-cyan-400 ${isPlaying ? 'animate-pulse' : ''}`} />
+          <h3 className={`font-bold text-sm flex flex-col min-w-0 flex-1 ${language === 'ar' ? '' : 'tracking-wider'}`}>
+            <span className="truncate">
+              {language === 'ar' ? 'الراديو الكوني الموسيقي' : 'COSMIC RADIO DJ'}
+            </span>
+            <span className={`text-[10px] font-arabic truncate ${isPlaying ? 'text-cyan-300' : 'text-gray-500'}`}>
+              {isPlaying
+                ? (language === 'ar' ? 'يعمل الآن' : 'NOW PLAYING')
+                : (language === 'ar' ? 'متوقف' : 'PAUSED')}
+            </span>
           </h3>
         </div>
         <button
           onClick={handlePlayToggle}
-          className={`p-2 rounded-full transition-all duration-300 border ${
+          className={`shrink-0 p-2.5 rounded-full transition-all duration-300 border ${
             isPlaying
-              ? 'bg-red-500/20 border-red-500/40 text-red-300 scale-105 shadow-md shadow-red-500/20'
-              : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300 hover:scale-105 hover:bg-cyan-500/30'
+              ? 'bg-red-500/20 border-red-500/40 text-red-300 shadow-md shadow-red-500/20'
+              : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30'
           }`}
           title={isPlaying ? (language === 'ar' ? 'إيقاف الموسيقى' : 'Stop Music') : (language === 'ar' ? 'تشغيل الموسيقى' : 'Start Music')}
         >
           {isPlaying ? (
-            <div className="flex items-center gap-1.5 px-0.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              <span className="text-xs font-semibold">OFF</span>
-            </div>
+            /* Red "off" button: solid stop square (■) with a live pulse around it */
+            <span className="relative flex h-4 w-4 items-center justify-center">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <Square size={11} className="relative fill-current text-red-400 drop-shadow" />
+            </span>
           ) : (
-            <div className="flex items-center gap-1.5 px-0.5">
-              <Music size={14} className="animate-bounce" />
-              <span className="text-xs font-semibold">ON</span>
-            </div>
+            <Music size={16} className="animate-bounce" />
           )}
         </button>
       </div>
@@ -355,40 +374,39 @@ const CosmicRadio: React.FC = () => {
 
       {/* Synth Presets */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[10px] text-gray-400 font-semibold tracking-wider flex justify-between">
-          <span>ATMOSPHERE MODE</span>
-          <span className="font-arabic text-gray-500">وضع الغلاف الموسيقي</span>
+        <span className={`text-[10px] text-gray-400 font-semibold truncate ${language === 'ar' ? '' : 'tracking-wider'}`}>
+          {language === 'ar' ? 'وضع الغلاف الموسيقي' : 'ATMOSPHERE MODE'}
         </span>
         <div className="grid grid-cols-3 gap-1">
           <button
             onClick={() => changeMode('deep')}
-            className={`text-[10px] py-1.5 rounded-lg transition-all duration-200 border font-semibold ${
+            className={`text-[10px] leading-tight py-1.5 px-1 rounded-lg transition-all duration-200 border font-semibold text-center ${
               currentMode === 'deep'
-                ? 'bg-cyan-500/30 border-cyan-400 text-cyan-300 scale-105'
+                ? 'bg-cyan-500/30 border-cyan-400 text-cyan-300 shadow-md'
                 : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
           >
-            Deep Space
+            {language === 'ar' ? 'الفضاء العميق' : 'Deep Space'}
           </button>
           <button
             onClick={() => changeMode('nebula')}
-            className={`text-[10px] py-1.5 rounded-lg transition-all duration-200 border font-semibold ${
+            className={`text-[10px] leading-tight py-1.5 px-1 rounded-lg transition-all duration-200 border font-semibold text-center ${
               currentMode === 'nebula'
-                ? 'bg-purple-500/30 border-purple-400 text-purple-300 scale-105'
+                ? 'bg-purple-500/30 border-purple-400 text-purple-300 shadow-md'
                 : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
           >
-            Nebula Dream
+            {language === 'ar' ? 'حلم السديم' : 'Nebula Dream'}
           </button>
           <button
             onClick={() => changeMode('solar')}
-            className={`text-[10px] py-1.5 rounded-lg transition-all duration-200 border font-semibold ${
+            className={`text-[10px] leading-tight py-1.5 px-1 rounded-lg transition-all duration-200 border font-semibold text-center ${
               currentMode === 'solar'
-                ? 'bg-amber-500/30 border-amber-400 text-amber-300 scale-105'
+                ? 'bg-amber-500/30 border-amber-400 text-amber-300 shadow-md'
                 : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
           >
-            Solar Wind
+            {language === 'ar' ? 'رياح الشمس' : 'Solar Wind'}
           </button>
         </div>
       </div>
@@ -409,9 +427,11 @@ const CosmicRadio: React.FC = () => {
       </div>
 
       {isPlaying && (
-        <div className="flex items-center justify-center gap-1 text-[9px] text-cyan-300/80 animate-pulse mt-0.5 font-mono">
-          <Sparkles size={10} className="animate-spin text-cyan-400" />
-          <span>REAL-TIME DYNAMIC SYNTHESIZER ACTIVE</span>
+        <div className="flex items-center justify-center gap-1.5 text-[9px] text-cyan-300/80 animate-pulse mt-0.5 text-center">
+          <Sparkles size={10} className="animate-spin shrink-0 text-cyan-400" />
+          <span className="font-arabic">
+            {language === 'ar' ? 'المُركّب الصوتي الحي يعمل الآن' : 'REAL-TIME DYNAMIC SYNTHESIZER ACTIVE'}
+          </span>
         </div>
       )}
 

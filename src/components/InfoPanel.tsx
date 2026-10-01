@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Volume2, VolumeX } from 'lucide-react';
 import { PlanetData } from '../data/planetData';
 import { useLanguage } from '../context/LanguageContext';
 import { getPlanetTranslationKeys } from '../i18n/translations';
+import { isSpeechSupported, speakText, stopSpeech } from '../utils/speech';
 
 interface InfoPanelProps {
   planet: PlanetData;
@@ -127,13 +128,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 
   // Text-To-Speech Narrator with multi-language capability
   const handleNarrateToggle = () => {
-    if (!('speechSynthesis' in window)) {
+    if (!isSpeechSupported()) {
       alert(language === 'ar' ? 'متصفحك لا يدعم توليد الصوت.' : 'Text-to-speech is not supported in your browser.');
       return;
     }
 
     if (isNarrating) {
-      window.speechSynthesis.cancel();
+      stopSpeech();
       setIsNarrating(false);
       playSpaceChime('beep');
       return;
@@ -148,74 +149,27 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     const dVal = `${planet.diameter.toLocaleString()} ${t('km')}`;
     const funFactLabel = t('funFact');
     
-    let textToSpeak = `${pName}. ${displayDescription}. ${factsLabel}: ${diameterLabel} ${dVal}. ${funFactLabel}: ${displayFunFact}.`;
+    // Full narration - periods help the shared engine split into natural pauses
+    const fullSpokenText = `${pName}. ${displayDescription}. ${factsLabel}. ${diameterLabel} ${dVal}. ${funFactLabel} ${displayFunFact}.`;
 
-    // Strip out some special symbols/exponents that might sound weird in speech
-    textToSpeak = textToSpeak.replace(/×/g, language === 'ar' ? 'مضروبة في' : 'times');
-    textToSpeak = textToSpeak.replace(/\^/g, language === 'ar' ? 'أس' : 'power of');
-
-    // Split text into sentences for robust browser TTS rendering
-    const sentences = textToSpeak.match(/[^.!?،؟]+[.!?،؟]*/g) || [textToSpeak];
-    let currentIndex = 0;
-
-    const speakNext = () => {
-      if (currentIndex >= sentences.length) {
-        setIsNarrating(false);
-        return;
-      }
-
-      const sentence = sentences[currentIndex].trim();
-      if (!sentence) {
-        currentIndex++;
-        speakNext();
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(sentence);
-      utterance.lang = language === 'ar' ? 'ar-SA' : 'en-US';
-
-      // Find appropriate regional voices
-      const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find(v => 
-        language === 'ar' ? v.lang.startsWith('ar') : v.lang.startsWith('en')
-      );
-      if (voice) {
-        utterance.voice = voice;
-      }
-
-      utterance.rate = language === 'ar' ? 0.95 : 1.05;
-      utterance.pitch = 1.0;
-
-      utterance.onend = () => {
-        currentIndex++;
-        speakNext();
-      };
-
-      utterance.onerror = (e) => {
-        // Interrupted or canceled
-        setIsNarrating(false);
-      };
-
-      window.speechSynthesis.speak(utterance);
-    };
+    // Legacy inline TTS removed - shared engine (tashkeel + male voice) handles it
 
     setIsNarrating(true);
-    speakNext();
+    speakText(fullSpokenText, {
+      lang: language === 'ar' ? 'ar' : 'en',
+      onEnd: () => setIsNarrating(false),
+    });
   };
 
   // Stop narration on unmount or when selected planet changes
   useEffect(() => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    stopSpeech();
     setIsNarrating(false);
   }, [planet]);
 
   useEffect(() => {
     return () => {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeech();
     };
   }, []);
   const isMoon = (planet as any).isMoon || parentId;

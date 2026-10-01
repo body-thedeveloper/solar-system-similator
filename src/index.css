@@ -174,7 +174,7 @@ a.inline-flex:active {
   text-align: left;
 }
 
-/* Arabic text optimization */
+/* Arabic text optimization - Cairo is the Arabic typeface for the app */
 .arabic-text {
   font-family: 'Cairo', sans-serif;
   font-weight: 400;

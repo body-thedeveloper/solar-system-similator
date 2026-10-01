@@ -27,12 +27,24 @@ export function setupSolarSystem(
 
   // Camera & controls
   const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 200000);
-  camera.position.set(0, 50, 100);
+
+  // Default camera view: a 45° three-quarter angle, zoomed in 3 steps from the previous
+  // ~677-unit top-down overview (the zoom-in control multiplies the distance by 0.7 per step).
+  // Shared by the initial view, the "Re-center" button and full resets so they always match,
+  // i.e. pressing Re-center returns exactly to what you get when the program is (re)loaded.
+  const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 164, 164); // 45° elevation, ~232 units out
+  const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
+  const DEFAULT_MIN_DISTANCE = 20;
+  const DEFAULT_MAX_DISTANCE = 100000;
+  // Incremented to cancel an in-flight camera animation whenever a new one starts
+  let cameraAnimToken = 0;
+
+  camera.position.copy(DEFAULT_CAMERA_POSITION);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
-  controls.minDistance = 20;
-  controls.maxDistance = 100000;
+  controls.minDistance = DEFAULT_MIN_DISTANCE;
+  controls.maxDistance = DEFAULT_MAX_DISTANCE;
 
   // Lighting & background
   scene.add(new THREE.AmbientLight(0x111111));
@@ -522,8 +534,11 @@ export function setupSolarSystem(
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
     orbitLabelSprite = new THREE.Sprite(mat);
 
-    // size and position (preserve aspect ratio)
-    const desiredHeight = scaledDist * 0.25 * LABEL_SCALE_MULTIPLIER;
+    // size and position (preserve aspect ratio), kept readable from far away as well
+    const desiredHeight = Math.max(
+      scaledDist * 0.25 * LABEL_SCALE_MULTIPLIER,
+      camera.position.distanceTo(controls.target) * 0.03
+    );
     const img = (tex.image as HTMLCanvasElement | undefined);
     const aspect = img && img.width && img.height ? img.width / img.height : 1;
     orbitLabelSprite.scale.set(aspect * desiredHeight, desiredHeight, 1);
@@ -588,7 +603,10 @@ export function setupSolarSystem(
       }
     }
     
-    if (foundOrbit && minDist < 3) {
+    // Scale the pick threshold with the camera distance: zoomed far out
+    // a fixed 3-unit threshold would only be a few pixels wide.
+    const hoverThreshold = Math.max(3, camera.position.distanceTo(controls.target) * 0.012);
+    if (foundOrbit && minDist < hoverThreshold) {
       if (hoveredOrbit !== foundOrbit.line) {
         // restore previous (set back to default black + low opacity)
         if (hoveredOrbit) {
@@ -729,7 +747,9 @@ export function setupSolarSystem(
     const startTarget = controls.target.clone();
     const duration = 900;
     const t0 = Date.now();
+    const token = ++cameraAnimToken;
     function step() {
+      if (token !== cameraAnimToken) return; // a newer camera animation took over
       const t = Math.min(1, (Date.now() - t0) / duration);
       camera.position.lerpVectors(startPos, targetPos, t);
       controls.target.lerpVectors(startTarget, worldPos, t);
@@ -748,7 +768,9 @@ export function setupSolarSystem(
     const startTarget = controls.target.clone();
     const duration = 900;
     const t0 = Date.now();
+    const token = ++cameraAnimToken;
     function step() {
+      if (token !== cameraAnimToken) return; // a newer camera animation took over
       const t = Math.min(1, (Date.now() - t0) / duration);
       camera.position.lerpVectors(startPos, targetPos, t);
       controls.target.lerpVectors(startTarget, worldPos, t);
@@ -798,6 +820,16 @@ export function setupSolarSystem(
     if (savedControls.minDistance !== undefined) controls.minDistance = savedControls.minDistance;
     if (savedControls.maxDistance !== undefined) controls.maxDistance = savedControls.maxDistance;
     if (savedControls.enablePan !== undefined) (controls as any).enablePan = savedControls.enablePan;
+  }
+
+  // Force the OrbitControls limits / up-vector back to their defaults.
+  // Surface-follow mode clamps min/max distance; a stale clamp would pin the camera to
+  // whatever it was following (right next to the Sun) and make Re-center useless.
+  function resetControlsLimits() {
+    controls.minDistance = DEFAULT_MIN_DISTANCE;
+    controls.maxDistance = DEFAULT_MAX_DISTANCE;
+    controls.enablePan = true;
+    camera.up.set(0, 1, 0);
   }
 
   // Pause moon orbital movement (keep self-rotation)
@@ -854,15 +886,18 @@ export function setupSolarSystem(
         m.position.z = Math.sin(moonAngle) * m.userData.orbitRadius;
       });
     });
-    // Animate camera back to initial position
+    // Animate camera back to the default view
+    resetControlsLimits(); // never let clamped controls pin the camera near a body
     const startPos = camera.position.clone();
     const startTarget = controls.target.clone();
     // Reset to initial website position - matches when user first enters
-    const targetPos = new THREE.Vector3(0, 50, 100);
-    const targetLook = new THREE.Vector3(0, 0, 0);
+    const targetPos = DEFAULT_CAMERA_POSITION.clone();
+    const targetLook = DEFAULT_CAMERA_TARGET.clone();
     const duration = 1500;
     const t0 = Date.now();
+    const token = ++cameraAnimToken;
     function step() {
+      if (token !== cameraAnimToken) return; // a newer camera animation took over
       const t = Math.min(1, (Date.now() - t0) / duration);
       camera.position.lerpVectors(startPos, targetPos, t);
       controls.target.lerpVectors(startTarget, targetLook, t);
@@ -917,8 +952,17 @@ export function setupSolarSystem(
         if (!ld) return;
         const sprite = ld.sprite;
         const pg = ld.planetGroup;
-        // If we don't have a planetGroup (sun label), skip the per-planet positioning
-        if (!pg) return;
+        const camDist = camera.position.distanceTo(controls.target);
+
+        // Static labels (the Sun) don't follow a planet group: keep them legible at any
+        // zoom level by scaling them with the camera distance.
+        if (!pg) {
+          const staticHeight = Math.max(2, camDist * 0.025);
+          const staticImg = (sprite.material as THREE.SpriteMaterial).map?.image as HTMLCanvasElement | undefined;
+          const staticAspect = staticImg && staticImg.width && staticImg.height ? staticImg.width / staticImg.height : 1;
+          sprite.scale.set(staticAspect * staticHeight, staticHeight, 1);
+          return;
+        }
 
         // Get planet world position and radius
         const worldPos = new THREE.Vector3();
@@ -935,8 +979,9 @@ export function setupSolarSystem(
         const local = pg.worldToLocal(labelWorldPos.clone());
         sprite.position.lerp(local, 0.6);
 
-        // keep label small (height relative to planet radius)
-        const desiredHeight = Math.max(6, radius * 0.45 * LABEL_SCALE_MULTIPLIER);
+        // keep label small (height relative to planet radius), but never smaller than a
+        // readable on-screen size when the camera is far away
+        const desiredHeight = Math.max(6, radius * 0.45 * LABEL_SCALE_MULTIPLIER, camDist * 0.02);
         const texImg = (sprite.material as THREE.SpriteMaterial).map?.image as HTMLCanvasElement | undefined;
         const aspect = texImg && texImg.width && texImg.height ? texImg.width / texImg.height : 1;
         sprite.scale.set(aspect * desiredHeight, desiredHeight, 1);
@@ -1008,7 +1053,10 @@ export function setupSolarSystem(
   // Zoom helpers (simple)
   function getCameraDistance() { return camera.position.length(); }
   let zoomTarget: number | null = null;
-  function setCameraDistance(distance: number) { zoomTarget = distance; }
+  function setCameraDistance(distance: number) {
+    cameraAnimToken++; // an explicit zoom cancels any camera animation in flight
+    zoomTarget = distance;
+  }
   function zoomIn() { setCameraDistance(Math.max(30, getCameraDistance() * 0.7)); }
   function zoomOut() { setCameraDistance(Math.min(controls.maxDistance - 10, getCameraDistance() * 1.4)); }
 
@@ -1030,6 +1078,32 @@ export function setupSolarSystem(
   })();
 
   // Cleanup
+  // Camera-only re-center: animate back to the default view/direction.
+  // Unlike resetCamera(), this does NOT teleport planets/moons back to their initial angles.
+  function resetCameraView() {
+    stopFollowPlanet();
+    zoomTarget = null; // cancel any in-flight smooth zoom so it doesn't fight this animation
+    resetControlsLimits(); // guard against a clamped OrbitControls state pinning the camera by the Sun
+    const startPos = camera.position.clone();
+    const startTarget = controls.target.clone();
+    // Exactly the view you get when the program is (re)loaded: the default 45° angle
+    // (see DEFAULT_CAMERA_POSITION).
+    const targetPos = DEFAULT_CAMERA_POSITION.clone();
+    const targetLook = DEFAULT_CAMERA_TARGET.clone();
+    const duration = 1200;
+    const t0 = Date.now();
+    const token = ++cameraAnimToken;
+    function step() {
+      if (token !== cameraAnimToken) return; // a newer camera animation took over
+      const t = Math.min(1, (Date.now() - t0) / duration);
+      camera.position.lerpVectors(startPos, targetPos, t);
+      controls.target.lerpVectors(startTarget, targetLook, t);
+      controls.update();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    step();
+  }
+
   function cleanupScene() {
     window.removeEventListener('resize', handleResize);
     renderer.dispose();
@@ -1090,6 +1164,7 @@ export function setupSolarSystem(
     resumeMoonOrbit,
     getFollowingPlanetId: () => followPlanetId,
     resetCamera,
+    resetCameraView,
     isGalaxyVisible: () => false
   };
 }

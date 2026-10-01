@@ -21,7 +21,7 @@ const LanguageSwitcher: React.FC = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 rounded-full liquid-glass-button shiny-border-hover text-cyan-400"
-        title="Change language"
+        title={language === 'ar' ? 'تغيير اللغة' : 'Change language'}
       >
         <Globe size={20} />
       </button>
